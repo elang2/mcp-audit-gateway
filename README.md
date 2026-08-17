@@ -1,8 +1,8 @@
 # mcp-audit
 
-Your AI agent made 847 tool calls yesterday. Can you prove what it did?
+Your AI agent made 847 tool calls yesterday. Can you verify what it did?
 
-Tamper-proof audit trail for AI agent tool calls.
+Tamper-evident audit trail for AI agent tool calls.
 
 ## Setup (10 seconds)
 
@@ -83,7 +83,7 @@ On first run, a signing key is auto-generated in `~/.mcp-audit/key.hex`. No conf
 }
 ```
 
-The `attestation` is an HMAC-SHA256 signature over the record's canonical fields. The `previousHash` is SHA-256 of the preceding record. Together they guarantee integrity, ordering, and completeness.
+The `attestation` is an HMAC-SHA256 signature over the record's canonical fields. The `previousHash` is SHA-256 of the preceding record. Together they detect tampering, ordering, and completeness.
 
 ## Use with Claude Desktop
 

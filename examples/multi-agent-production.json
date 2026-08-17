@@ -1,0 +1,72 @@
+{
+  "name": "production-gateway",
+  "version": "0.1.0",
+  "listen": {
+    "transport": "streamable-http",
+    "port": 3100,
+    "host": "0.0.0.0"
+  },
+  "upstreams": [
+    {
+      "name": "database",
+      "namespace": "db",
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://db-mcp-server:8080/mcp"
+      }
+    },
+    {
+      "name": "deploy-tools",
+      "namespace": "deploy",
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://deploy-mcp-server:8080/mcp"
+      }
+    },
+    {
+      "name": "monitoring",
+      "namespace": "mon",
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://monitoring-mcp-server:8080/mcp"
+      }
+    }
+  ],
+  "policy": {
+    "defaultEffect": "deny",
+    "rules": [
+      {
+        "effect": "allow",
+        "principals": ["agent:read-*"],
+        "tools": ["db/query", "mon/*"]
+      },
+      {
+        "effect": "allow",
+        "principals": ["agent:deploy-bot"],
+        "tools": ["deploy/*"],
+        "rateLimit": { "maxPerMinute": 5, "maxPerHour": 20 }
+      },
+      {
+        "effect": "allow",
+        "principals": ["agent:admin"],
+        "rateLimit": { "maxPerMinute": 60, "maxPerHour": 500 }
+      }
+    ]
+  },
+  "attestation": {
+    "enabled": true,
+    "algorithm": "ed25519",
+    "keyPath": "/etc/mcp-gateway/signing.key"
+  },
+  "telemetry": {
+    "enabled": true,
+    "serviceName": "mcp-audit-gateway",
+    "exporterEndpoint": "http://otel-collector:4318/v1/traces",
+    "sampleRate": 1.0
+  },
+  "auditLog": {
+    "enabled": true,
+    "path": "/var/log/mcp-audit/production.jsonl",
+    "rotateAfterMb": 500
+  }
+}

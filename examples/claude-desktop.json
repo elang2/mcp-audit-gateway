@@ -1,0 +1,50 @@
+{
+  "name": "claude-desktop-gateway",
+  "version": "0.1.0",
+  "listen": {
+    "transport": "stdio"
+  },
+  "upstreams": [
+    {
+      "name": "filesystem",
+      "namespace": "fs",
+      "transport": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["@modelcontextprotocol/server-filesystem", "/Users/you/projects"]
+      }
+    },
+    {
+      "name": "github",
+      "namespace": "gh",
+      "transport": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["@modelcontextprotocol/server-github"],
+        "env": {
+          "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+        }
+      }
+    }
+  ],
+  "policy": {
+    "defaultEffect": "allow",
+    "rules": [
+      {
+        "effect": "deny",
+        "tools": ["fs/write_file", "fs/create_directory"],
+        "principals": ["*"]
+      }
+    ]
+  },
+  "attestation": {
+    "enabled": true,
+    "algorithm": "hmac-sha256",
+    "secret": "${AUDIT_SECRET}"
+  },
+  "auditLog": {
+    "enabled": true,
+    "path": "~/.mcp-audit/claude-desktop.jsonl",
+    "rotateAfterMb": 50
+  }
+}

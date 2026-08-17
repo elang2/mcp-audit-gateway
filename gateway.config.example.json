@@ -1,0 +1,61 @@
+{
+  "name": "mcp-audit-gateway",
+  "version": "0.1.0",
+  "listen": {
+    "transport": "streamable-http",
+    "port": 3100,
+    "host": "127.0.0.1"
+  },
+  "upstreams": [
+    {
+      "name": "filesystem-server",
+      "namespace": "fs",
+      "transport": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["@modelcontextprotocol/server-filesystem", "/tmp"]
+      }
+    },
+    {
+      "name": "github-server",
+      "namespace": "github",
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://localhost:3001/mcp"
+      }
+    }
+  ],
+  "policy": {
+    "defaultEffect": "allow",
+    "rules": [
+      {
+        "effect": "deny",
+        "principals": ["agent:readonly-*"],
+        "tools": ["*/write_*", "*/delete_*", "*/create_*"]
+      },
+      {
+        "effect": "allow",
+        "principals": ["agent:admin"],
+        "rateLimit": {
+          "maxPerMinute": 60,
+          "maxPerHour": 1000
+        }
+      }
+    ]
+  },
+  "attestation": {
+    "enabled": true,
+    "algorithm": "ed25519"
+  },
+  "telemetry": {
+    "enabled": true,
+    "serviceName": "mcp-audit-gateway",
+    "exporterEndpoint": "http://localhost:4318/v1/traces",
+    "sampleRate": 1.0
+  },
+  "auditLog": {
+    "enabled": true,
+    "path": "./audit.jsonl",
+    "rotateAfterMb": 100
+  }
+}

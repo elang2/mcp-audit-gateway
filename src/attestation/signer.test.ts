@@ -42,6 +42,43 @@ describe("HmacSigner", () => {
   });
 });
 
+describe("decisionContextDigest in signatures", () => {
+  const secret = "b".repeat(64);
+  const signer = new HmacSigner(secret);
+
+  const recordWithDigest: AuditRecord = {
+    ...mockRecord,
+    id: "test-uuid-002",
+    decisionContextDigest: "c".repeat(64),
+  };
+
+  it("includes digest in signature when present", async () => {
+    const sigWith = await signer.sign(recordWithDigest);
+    const sigWithout = await signer.sign(mockRecord);
+    expect(sigWith).not.toBe(sigWithout);
+  });
+
+  it("verifies record with digest", async () => {
+    const sig = await signer.sign(recordWithDigest);
+    const valid = await signer.verify(recordWithDigest, sig);
+    expect(valid).toBe(true);
+  });
+
+  it("rejects tampered digest", async () => {
+    const sig = await signer.sign(recordWithDigest);
+    const tampered = { ...recordWithDigest, decisionContextDigest: "d".repeat(64) };
+    const valid = await signer.verify(tampered, sig);
+    expect(valid).toBe(false);
+  });
+
+  it("old records without digest still verify", async () => {
+    const oldRecord: AuditRecord = { ...mockRecord, id: "old-record-001" };
+    const sig = await signer.sign(oldRecord);
+    const valid = await signer.verify(oldRecord, sig);
+    expect(valid).toBe(true);
+  });
+});
+
 describe("Ed25519Signer", () => {
   it("signs and verifies a record", async () => {
     const signer = new Ed25519Signer();

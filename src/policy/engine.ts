@@ -1,9 +1,32 @@
+import { createHash } from "node:crypto";
 import type { PolicyRule, ToolEntry } from "../types.js";
 
 export interface PolicyDecision {
   allowed: boolean;
   reason?: string;
   rateLimit?: { maxPerMinute?: number; maxPerHour?: number };
+}
+
+export interface DecisionContext {
+  principal: string | null;
+  toolName: string;
+  toolNamespace: string;
+  toolUpstream: string;
+  matchedRule: PolicyRule | null;
+  effect: "allow" | "deny";
+}
+
+export function computeDecisionContextDigest(ctx: DecisionContext): string {
+  const ordered: [string, unknown][] = [
+    ["principal", ctx.principal],
+    ["toolName", ctx.toolName],
+    ["toolNamespace", ctx.toolNamespace],
+    ["toolUpstream", ctx.toolUpstream],
+    ["matchedRule", ctx.matchedRule],
+    ["effect", ctx.effect],
+  ];
+  const canonical = JSON.stringify(ordered);
+  return createHash("sha256").update(canonical).digest("hex");
 }
 
 interface RateLimitState {
@@ -22,7 +45,7 @@ export class PolicyEngine {
     private rules: PolicyRule[],
   ) {}
 
-  evaluate(principal: string | undefined, tool: ToolEntry): PolicyDecision {
+  evaluate(principal: string | undefined, tool: ToolEntry): PolicyDecision & { decisionContext: DecisionContext } {
     let matchedRule: PolicyRule | null = null;
 
     for (const rule of this.rules) {
@@ -32,23 +55,33 @@ export class PolicyEngine {
       }
     }
 
+    const buildContext = (effect: "allow" | "deny"): DecisionContext => ({
+      principal: principal ?? null,
+      toolName: tool.name,
+      toolNamespace: tool.namespace,
+      toolUpstream: tool.upstream,
+      matchedRule,
+      effect,
+    });
+
     if (!matchedRule) {
-      return { allowed: this.defaultEffect === "allow" };
+      const allowed = this.defaultEffect === "allow";
+      return { allowed, decisionContext: buildContext(allowed ? "allow" : "deny") };
     }
 
     if (matchedRule.effect === "deny") {
-      return { allowed: false, reason: "denied by policy rule" };
+      return { allowed: false, reason: "denied by policy rule", decisionContext: buildContext("deny") };
     }
 
     if (matchedRule.rateLimit) {
       const key = `${principal ?? "anonymous"}:${tool.name}`;
       const rateLimited = this.checkRateLimit(key, matchedRule.rateLimit);
       if (rateLimited) {
-        return { allowed: false, reason: "rate limit exceeded", rateLimit: matchedRule.rateLimit };
+        return { allowed: false, reason: "rate limit exceeded", rateLimit: matchedRule.rateLimit, decisionContext: buildContext("deny") };
       }
     }
 
-    return { allowed: true, rateLimit: matchedRule.rateLimit };
+    return { allowed: true, rateLimit: matchedRule.rateLimit, decisionContext: buildContext("allow") };
   }
 
   filterTools(principal: string | undefined, tools: ToolEntry[]): ToolEntry[] {

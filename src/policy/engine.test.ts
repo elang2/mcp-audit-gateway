@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PolicyEngine } from "./engine.js";
+import { PolicyEngine, computeDecisionContextDigest } from "./engine.js";
 import type { ToolEntry } from "../types.js";
 
 const tool = (name: string, ns: string): ToolEntry => ({
@@ -90,6 +90,52 @@ describe("PolicyEngine", () => {
       const filtered = engine.filterTools("agent:limited", tools);
       expect(filtered).toHaveLength(2);
       expect(filtered.map((t) => t.originalName)).not.toContain("dangerous_delete");
+    });
+  });
+
+  describe("decisionContext", () => {
+    const engine = new PolicyEngine("allow", [
+      { effect: "deny", principals: ["agent:readonly-*"], tools: ["*/write_*"] },
+    ]);
+
+    it("returns decision context with evaluation", () => {
+      const t = tool("write_file", "fs");
+      const result = engine.evaluate("agent:readonly-bot", t);
+      expect(result.decisionContext).toBeDefined();
+      expect(result.decisionContext.principal).toBe("agent:readonly-bot");
+      expect(result.decisionContext.toolName).toBe("fs/write_file");
+      expect(result.decisionContext.toolNamespace).toBe("fs");
+      expect(result.decisionContext.effect).toBe("deny");
+      expect(result.decisionContext.matchedRule).toEqual({
+        effect: "deny",
+        principals: ["agent:readonly-*"],
+        tools: ["*/write_*"],
+      });
+    });
+
+    it("produces stable digest for same input", () => {
+      const t = tool("write_file", "fs");
+      const r1 = engine.evaluate("agent:readonly-bot", t);
+      const r2 = engine.evaluate("agent:readonly-bot", t);
+      const d1 = computeDecisionContextDigest(r1.decisionContext);
+      const d2 = computeDecisionContextDigest(r2.decisionContext);
+      expect(d1).toBe(d2);
+      expect(d1).toHaveLength(64);
+    });
+
+    it("produces different digest for different principal", () => {
+      const t = tool("read_data", "github");
+      const r1 = engine.evaluate("agent:alpha", t);
+      const r2 = engine.evaluate("agent:beta", t);
+      const d1 = computeDecisionContextDigest(r1.decisionContext);
+      const d2 = computeDecisionContextDigest(r2.decisionContext);
+      expect(d1).not.toBe(d2);
+    });
+
+    it("includes null principal when undefined", () => {
+      const t = tool("read_data", "github");
+      const result = engine.evaluate(undefined, t);
+      expect(result.decisionContext.principal).toBeNull();
     });
   });
 });

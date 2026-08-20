@@ -98,6 +98,7 @@ export interface AuditRecord {
   durationMs: number;
   success: boolean;
   errorCode?: number;
+  decisionContextDigest?: string;
   previousHash?: string;
   attestation?: string;
 }

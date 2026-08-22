@@ -1,0 +1,47 @@
+{
+  "$schema": "https://ossf.github.io/security-insights/governance-declaration/v0.1",
+  "version": "0.1.0",
+  "framework": "mcp-audit-gateway",
+  "attestation": {
+    "predicate_type": "https://in-toto.io/attestation/ai-agent-action/v0.1",
+    "signing_algorithm": "ed25519",
+    "chain_algorithm": "sha256",
+    "tamper_evidence": "hash-chain",
+    "parties": [
+      {
+        "role": "witness",
+        "entity": "gateway",
+        "scope": [
+          "tool", "arguments", "result", "timing",
+          "principal", "namespace", "upstream",
+          "previousHash", "recordId", "method", "success"
+        ]
+      },
+      {
+        "role": "asserter",
+        "entity": "policy-engine",
+        "scope": ["decisionContextDigest"]
+      }
+    ]
+  },
+  "policy": {
+    "engine": "opa",
+    "bundle_digest_algorithm": "sha256",
+    "evaluation_record": true,
+    "human_approval_required": false
+  },
+  "observability": {
+    "otel_semconv": "mcp/v1.44.0",
+    "metrics": [
+      "mcp.client.operation.duration",
+      "mcp.server.operation.duration"
+    ],
+    "traces": true,
+    "context_propagation": "w3c-traceparent"
+  },
+  "verification": {
+    "conformance_vectors": "https://github.com/elang2/mcp-audit-gateway/tree/main/test/vectors",
+    "cross_language": ["javascript", "python"],
+    "vector_count": 17
+  }
+}

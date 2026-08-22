@@ -1,0 +1,9 @@
+# Example security-insights.yml snippet demonstrating SIEP-171 integration
+# This shows how governance-declaration works with a machine-readable target
+
+repository:
+  url: https://github.com/elang2/mcp-audit-gateway
+  status: active
+  agent-assisted-production:
+    used: true
+    governance-declaration: https://github.com/elang2/mcp-audit-gateway/blob/main/.well-known/agent-governance.json

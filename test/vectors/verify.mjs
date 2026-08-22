@@ -201,5 +201,73 @@ if (vectors.party_attribution) {
   }
 }
 
+// --- Chain with Parties ---
+if (vectors.party_attribution?.chain_with_parties) {
+  console.log("\n=== Chain with Parties ===\n");
+
+  const cwp = vectors.party_attribution.chain_with_parties;
+  for (let i = 0; i < cwp.records.length; i++) {
+    const entry = cwp.records[i];
+    const record = entry.record;
+
+    const canonical = canonicalizeFromRecord(record, vectors.field_order);
+    const canonHash = sha256Hex(canonical);
+    if (canonical === entry.canonical && canonHash === entry.sha256_canonical) {
+      console.log(`  PASS: chain_with_parties[${i}] canonical (${record.toolName})`);
+      passed++;
+    } else {
+      console.log(`  FAIL: chain_with_parties[${i}] canonical (${record.toolName})`);
+      failed++;
+    }
+
+    const refHash = sha256Hex(entry.full_record_json);
+    if (refHash === entry.record_hash) {
+      console.log(`  PASS: chain_with_parties[${i}] record_hash (${record.toolName})`);
+      passed++;
+    } else {
+      console.log(`  FAIL: chain_with_parties[${i}] record_hash (${record.toolName})`);
+      console.log(`    expected: ${entry.record_hash}`);
+      console.log(`    got:      ${refHash}`);
+      failed++;
+    }
+
+    let linkageOk;
+    if (i === 0) {
+      linkageOk = record.previousHash === cwp.genesis_seed;
+    } else {
+      const prev = cwp.records[i - 1];
+      linkageOk =
+        record.previousHash === prev.record_hash &&
+        entry.previous_record_hash === prev.record_hash;
+    }
+    if (linkageOk) {
+      console.log(`  PASS: chain_with_parties[${i}] linkage (${record.toolName})`);
+      passed++;
+    } else {
+      console.log(`  FAIL: chain_with_parties[${i}] linkage (${record.toolName})`);
+      failed++;
+    }
+  }
+}
+
+// --- Scope Order Significance ---
+if (vectors.party_attribution) {
+  const paVecs = vectors.party_attribution.vectors;
+  const origVec = paVecs.find((v) => v.name === "scope_order_original");
+  const sortVec = paVecs.find((v) => v.name === "scope_order_sorted");
+  if (origVec && sortVec) {
+    console.log("\n=== Scope Order Significance ===\n");
+    const hOrig = sha256Hex(canonicalizeFromRecord(origVec.record, vectors.field_order));
+    const hSort = sha256Hex(canonicalizeFromRecord(sortVec.record, vectors.field_order));
+    if (hOrig !== hSort) {
+      console.log("  PASS: different scope order produces different hash");
+      passed++;
+    } else {
+      console.log("  FAIL: scope order should produce different hashes");
+      failed++;
+    }
+  }
+}
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);
 process.exit(failed > 0 ? 1 : 0);

@@ -290,7 +290,7 @@
     }
   },
   "party_attribution": {
-    "description": "Vectors demonstrating multi-party attribution in the canonical form. The parties field is an array of {party, role, scope} objects that declares which entity asserted which fields. It appears at the end of the tuple-array (after previousHash, or after decisionContextDigest if present). Records without parties omit the field entirely from the canonical form — existing vectors remain unchanged.",
+    "description": "Vectors demonstrating multi-party attribution in the canonical form. The parties field is an array of {party, role, scope} objects that declares which entity asserted which fields. It appears at the end of the tuple-array (after previousHash, or after decisionContextDigest if present). Records without parties omit the field entirely from the canonical form. Includes edge cases: empty array vs null, scope ordering significance, and chain continuity with parties.",
     "vectors": [
       {
         "name": "parties_gateway_only",
@@ -307,7 +307,23 @@
           "success": true,
           "previousHash": "genesis",
           "parties": [
-            { "party": "gateway", "role": "witness", "scope": ["id","timestamp","method","toolName","namespace","upstream","principal","durationMs","success","errorCode","previousHash"] }
+            {
+              "party": "gateway",
+              "role": "witness",
+              "scope": [
+                "id",
+                "timestamp",
+                "method",
+                "toolName",
+                "namespace",
+                "upstream",
+                "principal",
+                "durationMs",
+                "success",
+                "errorCode",
+                "previousHash"
+              ]
+            }
           ]
         },
         "canonical": "[[\"id\",\"880e8400-e29b-41d4-a716-446655440001\"],[\"timestamp\",\"2026-08-22T10:00:00.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"read_file\"],[\"namespace\",\"filesystem\"],[\"upstream\",\"fs-server\"],[\"principal\",\"user:eve@example.com\"],[\"durationMs\",34],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"],[\"parties\",[{\"party\":\"gateway\",\"role\":\"witness\",\"scope\":[\"id\",\"timestamp\",\"method\",\"toolName\",\"namespace\",\"upstream\",\"principal\",\"durationMs\",\"success\",\"errorCode\",\"previousHash\"]}]]]",
@@ -329,8 +345,30 @@
           "decisionContextDigest": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
           "previousHash": "genesis",
           "parties": [
-            { "party": "gateway", "role": "witness", "scope": ["id","timestamp","method","toolName","namespace","upstream","principal","durationMs","success","errorCode","previousHash"] },
-            { "party": "policy-engine", "role": "asserter", "scope": ["decisionContextDigest"] }
+            {
+              "party": "gateway",
+              "role": "witness",
+              "scope": [
+                "id",
+                "timestamp",
+                "method",
+                "toolName",
+                "namespace",
+                "upstream",
+                "principal",
+                "durationMs",
+                "success",
+                "errorCode",
+                "previousHash"
+              ]
+            },
+            {
+              "party": "policy-engine",
+              "role": "asserter",
+              "scope": [
+                "decisionContextDigest"
+              ]
+            }
           ]
         },
         "canonical": "[[\"id\",\"880e8400-e29b-41d4-a716-446655440002\"],[\"timestamp\",\"2026-08-22T10:00:01.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"execute_query\"],[\"namespace\",\"database\"],[\"upstream\",\"db-server\"],[\"principal\",\"service:data-agent\"],[\"durationMs\",412],[\"success\",true],[\"errorCode\",null],[\"decisionContextDigest\",\"sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\"],[\"previousHash\",\"genesis\"],[\"parties\",[{\"party\":\"gateway\",\"role\":\"witness\",\"scope\":[\"id\",\"timestamp\",\"method\",\"toolName\",\"namespace\",\"upstream\",\"principal\",\"durationMs\",\"success\",\"errorCode\",\"previousHash\"]},{\"party\":\"policy-engine\",\"role\":\"asserter\",\"scope\":[\"decisionContextDigest\"]}]]]",
@@ -349,7 +387,196 @@
         },
         "canonical": "[[\"id\",\"880e8400-e29b-41d4-a716-446655440003\"],[\"timestamp\",\"2026-08-22T10:00:02.000Z\"],[\"method\",\"tools/list\"],[\"toolName\",null],[\"namespace\",null],[\"upstream\",null],[\"principal\",null],[\"durationMs\",2],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"]]",
         "sha256_canonical": "e6468120453a560a5d55c6b37fdc0df35213f9ffa3f93042d1583341ab530621"
+      },
+      {
+        "name": "parties_empty_array",
+        "description": "An empty parties array ([]) is NOT null and MUST be included in the canonical form. Distinguishes \"no attribution declared\" (null/absent = excluded) from \"parties explicitly empty\" ([] = included).",
+        "record": {
+          "id": "rec_empty_parties_001",
+          "timestamp": "2026-08-22T10:00:00.000Z",
+          "method": "tools/call",
+          "toolName": "validate",
+          "inputHash": "sha256:abc123",
+          "outputHash": "sha256:def456",
+          "durationMs": 42,
+          "success": true,
+          "errorCode": null,
+          "previousHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "namespace": "test",
+          "upstream": null,
+          "principal": "user:tester",
+          "parties": []
+        },
+        "canonical": "[[\"id\",\"rec_empty_parties_001\"],[\"timestamp\",\"2026-08-22T10:00:00.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"validate\"],[\"namespace\",\"test\"],[\"upstream\",null],[\"principal\",\"user:tester\"],[\"durationMs\",42],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"sha256:0000000000000000000000000000000000000000000000000000000000000000\"],[\"parties\",[]]]",
+        "sha256_canonical": "14b5da4505f02cd8414f24556e19b787fa7d9fc0fb033778f9ed512f9a265a16"
+      },
+      {
+        "name": "scope_order_original",
+        "description": "Scope array order is significant. [\"toolName\", \"id\", \"timestamp\"] produces a DIFFERENT hash than alphabetically sorted. Implementations MUST NOT sort scope arrays.",
+        "record": {
+          "id": "rec_scope_order_001",
+          "timestamp": "2026-08-22T11:00:00.000Z",
+          "method": "tools/call",
+          "toolName": "execute",
+          "inputHash": "sha256:aaa111",
+          "outputHash": "sha256:bbb222",
+          "durationMs": 100,
+          "success": true,
+          "errorCode": null,
+          "previousHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "namespace": "ordering-test",
+          "upstream": null,
+          "principal": "user:verifier",
+          "parties": [
+            {
+              "party": "gateway",
+              "role": "witness",
+              "scope": [
+                "toolName",
+                "id",
+                "timestamp"
+              ]
+            }
+          ]
+        },
+        "canonical": "[[\"id\",\"rec_scope_order_001\"],[\"timestamp\",\"2026-08-22T11:00:00.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"execute\"],[\"namespace\",\"ordering-test\"],[\"upstream\",null],[\"principal\",\"user:verifier\"],[\"durationMs\",100],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"],[\"parties\",[{\"party\":\"gateway\",\"role\":\"witness\",\"scope\":[\"toolName\",\"id\",\"timestamp\"]}]]]",
+        "sha256_canonical": "ae6803d101ac18ec66d883c15ca20b3ace811fc1f1d77938b653ff7e5066b3e0"
+      },
+      {
+        "name": "scope_order_sorted",
+        "description": "Same record as scope_order_original but with scope alphabetically sorted. Hash MUST differ, proving scope order is normative.",
+        "record": {
+          "id": "rec_scope_order_001",
+          "timestamp": "2026-08-22T11:00:00.000Z",
+          "method": "tools/call",
+          "toolName": "execute",
+          "inputHash": "sha256:aaa111",
+          "outputHash": "sha256:bbb222",
+          "durationMs": 100,
+          "success": true,
+          "errorCode": null,
+          "previousHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "namespace": "ordering-test",
+          "upstream": null,
+          "principal": "user:verifier",
+          "parties": [
+            {
+              "party": "gateway",
+              "role": "witness",
+              "scope": [
+                "id",
+                "timestamp",
+                "toolName"
+              ]
+            }
+          ]
+        },
+        "canonical": "[[\"id\",\"rec_scope_order_001\"],[\"timestamp\",\"2026-08-22T11:00:00.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"execute\"],[\"namespace\",\"ordering-test\"],[\"upstream\",null],[\"principal\",\"user:verifier\"],[\"durationMs\",100],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"],[\"parties\",[{\"party\":\"gateway\",\"role\":\"witness\",\"scope\":[\"id\",\"timestamp\",\"toolName\"]}]]]",
+        "sha256_canonical": "ab3287cabbfc2970ae5c1111a8fb32c9ab5b8d0382488a693229a68527ff8289"
       }
-    ]
+    ],
+    "chain_with_parties": {
+      "description": "Two-record chain where both records carry party attribution. Proves parties are included in record_hash used for chain linkage.",
+      "genesis_seed": "sha256:chain_parties_genesis_0000000000000000000000000000000000000000",
+      "records": [
+        {
+          "record": {
+            "id": "rec_chain_pa_001",
+            "timestamp": "2026-08-22T12:00:00.000Z",
+            "method": "tools/call",
+            "toolName": "fetch_data",
+            "inputHash": "sha256:input_fetch",
+            "outputHash": "sha256:output_fetch",
+            "durationMs": 230,
+            "success": true,
+            "errorCode": null,
+            "previousHash": "sha256:chain_parties_genesis_0000000000000000000000000000000000000000",
+            "namespace": "chain-party-test",
+            "upstream": "https://api.example.com",
+            "principal": "user:chain-tester",
+            "decisionContextDigest": "sha256:policy_eval_001",
+            "parties": [
+              {
+                "party": "gateway",
+                "role": "witness",
+                "scope": [
+                  "id",
+                  "timestamp",
+                  "method",
+                  "toolName",
+                  "namespace",
+                  "upstream",
+                  "principal",
+                  "durationMs",
+                  "success",
+                  "errorCode",
+                  "previousHash"
+                ]
+              },
+              {
+                "party": "policy-engine",
+                "role": "asserter",
+                "scope": [
+                  "decisionContextDigest"
+                ]
+              }
+            ]
+          },
+          "canonical": "[[\"id\",\"rec_chain_pa_001\"],[\"timestamp\",\"2026-08-22T12:00:00.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"fetch_data\"],[\"namespace\",\"chain-party-test\"],[\"upstream\",\"https://api.example.com\"],[\"principal\",\"user:chain-tester\"],[\"durationMs\",230],[\"success\",true],[\"errorCode\",null],[\"decisionContextDigest\",\"sha256:policy_eval_001\"],[\"previousHash\",\"sha256:chain_parties_genesis_0000000000000000000000000000000000000000\"],[\"parties\",[{\"party\":\"gateway\",\"role\":\"witness\",\"scope\":[\"id\",\"timestamp\",\"method\",\"toolName\",\"namespace\",\"upstream\",\"principal\",\"durationMs\",\"success\",\"errorCode\",\"previousHash\"]},{\"party\":\"policy-engine\",\"role\":\"asserter\",\"scope\":[\"decisionContextDigest\"]}]]]",
+          "sha256_canonical": "5ff1b9a27985dbd920a44a81661e134a8f1b6968c0f30ac4fb027c5cb62fc10e",
+          "full_record_json": "{\"id\":\"rec_chain_pa_001\",\"timestamp\":\"2026-08-22T12:00:00.000Z\",\"method\":\"tools/call\",\"toolName\":\"fetch_data\",\"inputHash\":\"sha256:input_fetch\",\"outputHash\":\"sha256:output_fetch\",\"durationMs\":230,\"success\":true,\"errorCode\":null,\"previousHash\":\"sha256:chain_parties_genesis_0000000000000000000000000000000000000000\",\"namespace\":\"chain-party-test\",\"upstream\":\"https://api.example.com\",\"principal\":\"user:chain-tester\",\"decisionContextDigest\":\"sha256:policy_eval_001\",\"parties\":[{\"party\":\"gateway\",\"role\":\"witness\",\"scope\":[\"id\",\"timestamp\",\"method\",\"toolName\",\"namespace\",\"upstream\",\"principal\",\"durationMs\",\"success\",\"errorCode\",\"previousHash\"]},{\"party\":\"policy-engine\",\"role\":\"asserter\",\"scope\":[\"decisionContextDigest\"]}]}",
+          "record_hash": "f154e23342cd33318799c1edc23507437d17a04451aad1a89f733afd3b74c195"
+        },
+        {
+          "record": {
+            "id": "rec_chain_pa_002",
+            "timestamp": "2026-08-22T12:00:01.500Z",
+            "method": "tools/call",
+            "toolName": "transform_data",
+            "inputHash": "sha256:input_transform",
+            "outputHash": "sha256:output_transform",
+            "durationMs": 85,
+            "success": true,
+            "errorCode": null,
+            "previousHash": "f154e23342cd33318799c1edc23507437d17a04451aad1a89f733afd3b74c195",
+            "namespace": "chain-party-test",
+            "upstream": null,
+            "principal": "user:chain-tester",
+            "decisionContextDigest": "sha256:policy_eval_002",
+            "parties": [
+              {
+                "party": "gateway",
+                "role": "witness",
+                "scope": [
+                  "id",
+                  "timestamp",
+                  "method",
+                  "toolName",
+                  "namespace",
+                  "upstream",
+                  "principal",
+                  "durationMs",
+                  "success",
+                  "errorCode",
+                  "previousHash"
+                ]
+              },
+              {
+                "party": "policy-engine",
+                "role": "asserter",
+                "scope": [
+                  "decisionContextDigest"
+                ]
+              }
+            ]
+          },
+          "canonical": "[[\"id\",\"rec_chain_pa_002\"],[\"timestamp\",\"2026-08-22T12:00:01.500Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"transform_data\"],[\"namespace\",\"chain-party-test\"],[\"upstream\",null],[\"principal\",\"user:chain-tester\"],[\"durationMs\",85],[\"success\",true],[\"errorCode\",null],[\"decisionContextDigest\",\"sha256:policy_eval_002\"],[\"previousHash\",\"f154e23342cd33318799c1edc23507437d17a04451aad1a89f733afd3b74c195\"],[\"parties\",[{\"party\":\"gateway\",\"role\":\"witness\",\"scope\":[\"id\",\"timestamp\",\"method\",\"toolName\",\"namespace\",\"upstream\",\"principal\",\"durationMs\",\"success\",\"errorCode\",\"previousHash\"]},{\"party\":\"policy-engine\",\"role\":\"asserter\",\"scope\":[\"decisionContextDigest\"]}]]]",
+          "sha256_canonical": "7583bd43ae7ca4eefb9bf143af5c3d77a79fde96bb0d98d1fdb68c94d6246c7b",
+          "full_record_json": "{\"id\":\"rec_chain_pa_002\",\"timestamp\":\"2026-08-22T12:00:01.500Z\",\"method\":\"tools/call\",\"toolName\":\"transform_data\",\"inputHash\":\"sha256:input_transform\",\"outputHash\":\"sha256:output_transform\",\"durationMs\":85,\"success\":true,\"errorCode\":null,\"previousHash\":\"f154e23342cd33318799c1edc23507437d17a04451aad1a89f733afd3b74c195\",\"namespace\":\"chain-party-test\",\"upstream\":null,\"principal\":\"user:chain-tester\",\"decisionContextDigest\":\"sha256:policy_eval_002\",\"parties\":[{\"party\":\"gateway\",\"role\":\"witness\",\"scope\":[\"id\",\"timestamp\",\"method\",\"toolName\",\"namespace\",\"upstream\",\"principal\",\"durationMs\",\"success\",\"errorCode\",\"previousHash\"]},{\"party\":\"policy-engine\",\"role\":\"asserter\",\"scope\":[\"decisionContextDigest\"]}]}",
+          "record_hash": "592254c9851b3a7fad4c17bef66f73d8b4bc58ea58d041c08e0ceff27f9d98c8",
+          "previous_record_hash": "f154e23342cd33318799c1edc23507437d17a04451aad1a89f733afd3b74c195"
+        }
+      ]
+    }
   }
 }

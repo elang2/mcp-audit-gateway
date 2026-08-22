@@ -196,6 +196,75 @@ if "party_attribution" in vectors:
                 print(f"    hash got:      {h}")
             failed += 1
 
+# --- Chain with Parties vectors ---
+if "party_attribution" in vectors and "chain_with_parties" in vectors["party_attribution"]:
+    print("\n=== Chain with Parties ===\n")
+
+    cwp = vectors["party_attribution"]["chain_with_parties"]
+    for i, entry in enumerate(cwp["records"]):
+        record = entry["record"]
+
+        canonical = canonicalize(record)
+        canon_hash = sha256_hex(canonical)
+        canon_match = canonical == entry["canonical"]
+        canon_hash_match = canon_hash == entry["sha256_canonical"]
+
+        if canon_match and canon_hash_match:
+            print(f"  PASS: chain_with_parties[{i}] canonical ({record['toolName']})")
+            passed += 1
+        else:
+            print(f"  FAIL: chain_with_parties[{i}] canonical ({record['toolName']})")
+            if not canon_match:
+                print(f"    canonical mismatch")
+            if not canon_hash_match:
+                print(f"    canonical hash mismatch")
+            failed += 1
+
+        reference_json = entry["full_record_json"]
+        reference_hash = sha256_hex(reference_json)
+        chain_match = reference_hash == entry["record_hash"]
+
+        if chain_match:
+            print(f"  PASS: chain_with_parties[{i}] record_hash ({record['toolName']})")
+            passed += 1
+        else:
+            print(f"  FAIL: chain_with_parties[{i}] record_hash ({record['toolName']})")
+            print(f"    expected: {entry['record_hash']}")
+            print(f"    got:      {reference_hash}")
+            failed += 1
+
+        if i == 0:
+            linkage_ok = record["previousHash"] == cwp["genesis_seed"]
+        else:
+            prev = cwp["records"][i - 1]
+            linkage_ok = (
+                record["previousHash"] == prev["record_hash"]
+                and entry.get("previous_record_hash") == prev["record_hash"]
+            )
+
+        if linkage_ok:
+            print(f"  PASS: chain_with_parties[{i}] linkage ({record['toolName']})")
+            passed += 1
+        else:
+            print(f"  FAIL: chain_with_parties[{i}] linkage ({record['toolName']})")
+            failed += 1
+
+# --- Scope Order Significance ---
+if "party_attribution" in vectors:
+    pa_vectors = vectors["party_attribution"]["vectors"]
+    scope_orig = next((v for v in pa_vectors if v["name"] == "scope_order_original"), None)
+    scope_sort = next((v for v in pa_vectors if v["name"] == "scope_order_sorted"), None)
+    if scope_orig and scope_sort:
+        print("\n=== Scope Order Significance ===\n")
+        h_orig = sha256_hex(canonicalize(scope_orig["record"]))
+        h_sort = sha256_hex(canonicalize(scope_sort["record"]))
+        if h_orig != h_sort:
+            print("  PASS: different scope order produces different hash")
+            passed += 1
+        else:
+            print("  FAIL: scope order should produce different hashes")
+            failed += 1
+
 # --- Summary ---
 print(f"\n=== Results: {passed} passed, {failed} failed ===")
 

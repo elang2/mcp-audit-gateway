@@ -29,6 +29,7 @@ export class AuditLog {
       durationMs: number;
       success: boolean;
       errorCode?: number;
+      decisionContextDigest?: string;
     },
   ): Promise<AuditRecord> {
     return new Promise((resolve, reject) => {
@@ -53,6 +54,7 @@ export class AuditLog {
       durationMs: number;
       success: boolean;
       errorCode?: number;
+      decisionContextDigest?: string;
     },
   ): Promise<AuditRecord> {
     const record: AuditRecord = {

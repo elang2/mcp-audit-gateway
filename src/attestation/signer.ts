@@ -90,6 +90,9 @@ function canonicalizeRecord(record: AuditRecord): string {
     ["errorCode", record.errorCode ?? null],
     ["previousHash", record.previousHash ?? null],
   ];
+  if (record.decisionContextDigest != null) {
+    ordered.splice(10, 0, ["decisionContextDigest", record.decisionContextDigest]);
+  }
   return JSON.stringify(ordered);
 }
 

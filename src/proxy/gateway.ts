@@ -5,7 +5,7 @@ import type {
   ToolEntry,
   AuditRecord,
 } from "../types.js";
-import { PolicyEngine } from "../policy/engine.js";
+import { PolicyEngine, computeDecisionContextDigest } from "../policy/engine.js";
 import { AuditLog } from "../attestation/audit-log.js";
 import { createSigner } from "../attestation/signer.js";
 import { GatewayTracer } from "../telemetry/tracer.js";
@@ -113,6 +113,8 @@ export class Gateway {
     }
 
     const decision = this.policyEngine.evaluate(principal, tool);
+    const contextDigest = computeDecisionContextDigest(decision.decisionContext);
+
     if (!decision.allowed) {
       this.metrics.recordPolicyDenial({
         principal: principal ?? "anonymous",
@@ -127,6 +129,7 @@ export class Gateway {
         durationMs: Date.now() - startTime,
         success: false,
         errorCode: -32603,
+        decisionContextDigest: contextDigest,
       });
       throw new ToolCallError(
         -32603,
@@ -173,6 +176,7 @@ export class Gateway {
         principal,
         durationMs,
         success: true,
+        decisionContextDigest: contextDigest,
       });
 
       return { result, auditRecord: record };
@@ -202,6 +206,7 @@ export class Gateway {
         durationMs,
         success: false,
         errorCode: -32603,
+        decisionContextDigest: contextDigest,
       });
       throw new ToolCallError(-32603, "Upstream server error", record);
     }

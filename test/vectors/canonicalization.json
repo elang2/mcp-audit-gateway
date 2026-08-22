@@ -1,0 +1,288 @@
+{
+  "format_version": "1.1.0",
+  "implementation": "mcp-audit-gateway",
+  "canonical_form": "tuple-array",
+  "description": "Conformance vectors for mcp-audit-gateway's tuple-array canonicalization and SHA-256 hash chain.",
+  "encoding": "utf-8",
+  "hash_algorithm": "sha256",
+  "hash_output": "hex-lowercase",
+  "null_rule": "Fields listed in field_order that are absent or undefined in the source record MUST be serialized as JSON null in the tuple-array canonical form.",
+  "signing_exclusions": [
+    "attestation"
+  ],
+  "signing_note": "The attestation field is excluded from the canonical form used for signing. It cannot be included because the signature IS the attestation value (including it would be circular). The canonical form contains exactly the 11 fields listed in field_order.",
+  "chain_hash_note": "The chain hash (record_hash) uses JSON.stringify(fullRecord) which INCLUDES the attestation field. This binds the signature into the chain sequence, preventing attestation stripping without breaking the chain. The chain hash depends on JavaScript insertion order; verifiers must serialize keys in the order specified by chain.chain_key_order.",
+  "field_order": [
+    "id",
+    "timestamp",
+    "method",
+    "toolName",
+    "namespace",
+    "upstream",
+    "principal",
+    "durationMs",
+    "success",
+    "errorCode",
+    "previousHash"
+  ],
+  "canonicalization": [
+    {
+      "name": "genesis_all_fields",
+      "record": {
+        "id": "550e8400-e29b-41d4-a716-446655440001",
+        "timestamp": "2026-08-21T12:00:00.000Z",
+        "method": "tools/call",
+        "toolName": "weather_lookup",
+        "namespace": "external-apis",
+        "upstream": "weather-server",
+        "principal": "user:alice@example.com",
+        "durationMs": 142,
+        "success": true,
+        "previousHash": "genesis"
+      },
+      "canonical": "[[\"id\",\"550e8400-e29b-41d4-a716-446655440001\"],[\"timestamp\",\"2026-08-21T12:00:00.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"weather_lookup\"],[\"namespace\",\"external-apis\"],[\"upstream\",\"weather-server\"],[\"principal\",\"user:alice@example.com\"],[\"durationMs\",142],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"]]",
+      "sha256_canonical": "4e9c29d6e22fc2ef1f931994997b01f48f054c1294a7c287bfeece79417e5d43"
+    },
+    {
+      "name": "genesis_null_optionals",
+      "record": {
+        "id": "550e8400-e29b-41d4-a716-446655440002",
+        "timestamp": "2026-08-21T12:00:01.000Z",
+        "method": "tools/list",
+        "durationMs": 3,
+        "success": true,
+        "previousHash": "genesis"
+      },
+      "canonical": "[[\"id\",\"550e8400-e29b-41d4-a716-446655440002\"],[\"timestamp\",\"2026-08-21T12:00:01.000Z\"],[\"method\",\"tools/list\"],[\"toolName\",null],[\"namespace\",null],[\"upstream\",null],[\"principal\",null],[\"durationMs\",3],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"]]",
+      "sha256_canonical": "e6d9cb79804d69a479c59e2c4e162e90a505ee3cc311d68f6225332764b417c0"
+    },
+    {
+      "name": "error_with_code",
+      "record": {
+        "id": "550e8400-e29b-41d4-a716-446655440003",
+        "timestamp": "2026-08-21T12:00:02.500Z",
+        "method": "tools/call",
+        "toolName": "database_query",
+        "namespace": "internal",
+        "upstream": "db-server",
+        "principal": "service:backend-agent",
+        "durationMs": 5021,
+        "success": false,
+        "errorCode": -32603,
+        "previousHash": "genesis"
+      },
+      "canonical": "[[\"id\",\"550e8400-e29b-41d4-a716-446655440003\"],[\"timestamp\",\"2026-08-21T12:00:02.500Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"database_query\"],[\"namespace\",\"internal\"],[\"upstream\",\"db-server\"],[\"principal\",\"service:backend-agent\"],[\"durationMs\",5021],[\"success\",false],[\"errorCode\",-32603],[\"previousHash\",\"genesis\"]]",
+      "sha256_canonical": "01f4d49a71137289af02111ca6a6b2d7568a7ab4d28aefcfaa17a679bcda90b6"
+    },
+    {
+      "name": "zero_duration",
+      "record": {
+        "id": "550e8400-e29b-41d4-a716-446655440004",
+        "timestamp": "2026-08-21T12:00:03.000Z",
+        "method": "tools/call",
+        "toolName": "cache_get",
+        "namespace": "infra",
+        "upstream": "cache-server",
+        "durationMs": 0,
+        "success": true,
+        "previousHash": "genesis"
+      },
+      "canonical": "[[\"id\",\"550e8400-e29b-41d4-a716-446655440004\"],[\"timestamp\",\"2026-08-21T12:00:03.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"cache_get\"],[\"namespace\",\"infra\"],[\"upstream\",\"cache-server\"],[\"principal\",null],[\"durationMs\",0],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"]]",
+      "sha256_canonical": "e67ed42f822a66e7851de0044e7a02b9e66a525419c78166966fa88cca5c325e"
+    },
+    {
+      "name": "invalid_params_error",
+      "record": {
+        "id": "550e8400-e29b-41d4-a716-446655440005",
+        "timestamp": "2026-08-21T12:00:04.000Z",
+        "method": "tools/call",
+        "toolName": "send_email",
+        "namespace": "comms",
+        "upstream": "email-server",
+        "principal": "user:bob@example.com",
+        "durationMs": 12,
+        "success": false,
+        "errorCode": -32602,
+        "previousHash": "genesis"
+      },
+      "canonical": "[[\"id\",\"550e8400-e29b-41d4-a716-446655440005\"],[\"timestamp\",\"2026-08-21T12:00:04.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"send_email\"],[\"namespace\",\"comms\"],[\"upstream\",\"email-server\"],[\"principal\",\"user:bob@example.com\"],[\"durationMs\",12],[\"success\",false],[\"errorCode\",-32602],[\"previousHash\",\"genesis\"]]",
+      "sha256_canonical": "a67508503e33af3fcf179c34f3ff4e6a0c066870e481fb999f9d03e128f3af3b"
+    },
+    {
+      "name": "unicode_in_fields",
+      "record": {
+        "id": "550e8400-e29b-41d4-a716-446655440006",
+        "timestamp": "2026-08-21T12:00:05.000Z",
+        "method": "tools/call",
+        "toolName": "天気検索",
+        "namespace": "external-apis",
+        "upstream": "weather-server-⚡",
+        "principal": "user:tanaka.太郎@example.jp",
+        "durationMs": 88,
+        "success": true,
+        "previousHash": "genesis"
+      },
+      "canonical": "[[\"id\",\"550e8400-e29b-41d4-a716-446655440006\"],[\"timestamp\",\"2026-08-21T12:00:05.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"天気検索\"],[\"namespace\",\"external-apis\"],[\"upstream\",\"weather-server-⚡\"],[\"principal\",\"user:tanaka.太郎@example.jp\"],[\"durationMs\",88],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"]]",
+      "sha256_canonical": "715926536f94e0a05f59613c9b41a7be103df413202fb9bcdefee2a402697a4e"
+    },
+    {
+      "name": "max_safe_integer_duration",
+      "record": {
+        "id": "550e8400-e29b-41d4-a716-446655440007",
+        "timestamp": "2026-08-21T12:00:06.000Z",
+        "method": "tools/call",
+        "toolName": "long_running_task",
+        "namespace": "compute",
+        "upstream": "batch-server",
+        "principal": "service:scheduler",
+        "durationMs": 9007199254740991,
+        "success": true,
+        "previousHash": "genesis"
+      },
+      "canonical": "[[\"id\",\"550e8400-e29b-41d4-a716-446655440007\"],[\"timestamp\",\"2026-08-21T12:00:06.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"long_running_task\"],[\"namespace\",\"compute\"],[\"upstream\",\"batch-server\"],[\"principal\",\"service:scheduler\"],[\"durationMs\",9007199254740991],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"]]",
+      "sha256_canonical": "75c90c99a36a895d1ba5acdb05167443e0fd1a1b3bf2a305d4cefdcac024511a"
+    },
+    {
+      "name": "empty_string_tool_name",
+      "record": {
+        "id": "550e8400-e29b-41d4-a716-446655440008",
+        "timestamp": "2026-08-21T12:00:07.000Z",
+        "method": "tools/call",
+        "toolName": "",
+        "namespace": "",
+        "upstream": "legacy-server",
+        "principal": "user:admin",
+        "durationMs": 1,
+        "success": true,
+        "previousHash": "genesis"
+      },
+      "canonical": "[[\"id\",\"550e8400-e29b-41d4-a716-446655440008\"],[\"timestamp\",\"2026-08-21T12:00:07.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"\"],[\"namespace\",\"\"],[\"upstream\",\"legacy-server\"],[\"principal\",\"user:admin\"],[\"durationMs\",1],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"]]",
+      "sha256_canonical": "2343460398a9d803ccedd27d8cc1d9693897e58e0c4d8985e2e88ba60170835c"
+    }
+  ],
+  "chain": {
+    "description": "Three linked records demonstrating hash chain verification. The chain hash covers the FULL record including the attestation field. This means the attestation (signature) is bound into the chain sequence.",
+    "chain_algorithm": "sha256(JSON.stringify(fullRecord))",
+    "chain_key_order": [
+      "id",
+      "timestamp",
+      "method",
+      "toolName",
+      "namespace",
+      "upstream",
+      "principal",
+      "durationMs",
+      "success",
+      "previousHash",
+      "attestation"
+    ],
+    "chain_key_order_note": "The chain hash uses JSON.stringify which preserves JavaScript insertion order. Verifiers in languages without ordered maps MUST serialize keys in this exact order to reproduce chain hashes. The canonical form (tuple-array) does NOT have this limitation.",
+    "genesis_seed": "genesis",
+    "records": [
+      {
+        "record": {
+          "id": "660e8400-e29b-41d4-a716-446655440001",
+          "timestamp": "2026-08-21T13:00:00.000Z",
+          "method": "tools/call",
+          "toolName": "search",
+          "namespace": "research",
+          "upstream": "search-server",
+          "principal": "user:carol@example.com",
+          "durationMs": 230,
+          "success": true,
+          "previousHash": "genesis",
+          "attestation": "abc123deadbeef"
+        },
+        "full_record_json": "{\"id\":\"660e8400-e29b-41d4-a716-446655440001\",\"timestamp\":\"2026-08-21T13:00:00.000Z\",\"method\":\"tools/call\",\"toolName\":\"search\",\"namespace\":\"research\",\"upstream\":\"search-server\",\"principal\":\"user:carol@example.com\",\"durationMs\":230,\"success\":true,\"previousHash\":\"genesis\",\"attestation\":\"abc123deadbeef\"}",
+        "record_hash": "bcb759bae3e453c133cae1dd026b477522bc493084be15a84686d7b819eb2b99",
+        "canonical": "[[\"id\",\"660e8400-e29b-41d4-a716-446655440001\"],[\"timestamp\",\"2026-08-21T13:00:00.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"search\"],[\"namespace\",\"research\"],[\"upstream\",\"search-server\"],[\"principal\",\"user:carol@example.com\"],[\"durationMs\",230],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"]]",
+        "sha256_canonical": "2779a8c2eee23f409039929b49b7dd6df30e95ba9a3d83e6443d16c13ba5306a"
+      },
+      {
+        "record": {
+          "id": "660e8400-e29b-41d4-a716-446655440002",
+          "timestamp": "2026-08-21T13:00:01.500Z",
+          "method": "tools/call",
+          "toolName": "summarize",
+          "namespace": "research",
+          "upstream": "llm-server",
+          "principal": "user:carol@example.com",
+          "durationMs": 1840,
+          "success": true,
+          "previousHash": "bcb759bae3e453c133cae1dd026b477522bc493084be15a84686d7b819eb2b99",
+          "attestation": "def456cafebabe"
+        },
+        "full_record_json": "{\"id\":\"660e8400-e29b-41d4-a716-446655440002\",\"timestamp\":\"2026-08-21T13:00:01.500Z\",\"method\":\"tools/call\",\"toolName\":\"summarize\",\"namespace\":\"research\",\"upstream\":\"llm-server\",\"principal\":\"user:carol@example.com\",\"durationMs\":1840,\"success\":true,\"previousHash\":\"bcb759bae3e453c133cae1dd026b477522bc493084be15a84686d7b819eb2b99\",\"attestation\":\"def456cafebabe\"}",
+        "record_hash": "8890ec9936274006781013783a3e4b319ae4e912bb14a597800efc9347a29abe",
+        "canonical": "[[\"id\",\"660e8400-e29b-41d4-a716-446655440002\"],[\"timestamp\",\"2026-08-21T13:00:01.500Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"summarize\"],[\"namespace\",\"research\"],[\"upstream\",\"llm-server\"],[\"principal\",\"user:carol@example.com\"],[\"durationMs\",1840],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"bcb759bae3e453c133cae1dd026b477522bc493084be15a84686d7b819eb2b99\"]]",
+        "sha256_canonical": "89bf2344f791f6f20bbb74fc8dfffeca1c1a3877cf60fa225c5d7292e8189bb9",
+        "previous_record_hash": "bcb759bae3e453c133cae1dd026b477522bc493084be15a84686d7b819eb2b99"
+      },
+      {
+        "record": {
+          "id": "660e8400-e29b-41d4-a716-446655440003",
+          "timestamp": "2026-08-21T13:00:05.000Z",
+          "method": "tools/call",
+          "toolName": "store_result",
+          "namespace": "research",
+          "upstream": "storage-server",
+          "principal": "user:carol@example.com",
+          "durationMs": 45,
+          "success": true,
+          "previousHash": "8890ec9936274006781013783a3e4b319ae4e912bb14a597800efc9347a29abe",
+          "attestation": "789abcfeedface"
+        },
+        "full_record_json": "{\"id\":\"660e8400-e29b-41d4-a716-446655440003\",\"timestamp\":\"2026-08-21T13:00:05.000Z\",\"method\":\"tools/call\",\"toolName\":\"store_result\",\"namespace\":\"research\",\"upstream\":\"storage-server\",\"principal\":\"user:carol@example.com\",\"durationMs\":45,\"success\":true,\"previousHash\":\"8890ec9936274006781013783a3e4b319ae4e912bb14a597800efc9347a29abe\",\"attestation\":\"789abcfeedface\"}",
+        "record_hash": "287b9307278203eab4429fea6636492044f428b96ade97910aa7ad86303ffc16",
+        "canonical": "[[\"id\",\"660e8400-e29b-41d4-a716-446655440003\"],[\"timestamp\",\"2026-08-21T13:00:05.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"store_result\"],[\"namespace\",\"research\"],[\"upstream\",\"storage-server\"],[\"principal\",\"user:carol@example.com\"],[\"durationMs\",45],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"8890ec9936274006781013783a3e4b319ae4e912bb14a597800efc9347a29abe\"]]",
+        "sha256_canonical": "d049da892b814c95c3e5c31e4756c5db26023a85e6f41e2c38984146b3fb2597",
+        "previous_record_hash": "8890ec9936274006781013783a3e4b319ae4e912bb14a597800efc9347a29abe"
+      }
+    ]
+  },
+  "dual_hash_demo": {
+    "description": "Two records with identical auditable fields but different attestation values. They produce the SAME canonical hash (attestation is excluded from signing) but DIFFERENT chain hashes (attestation is included in chain). This demonstrates the dual-hash design.",
+    "record_a": {
+      "record": {
+        "id": "770e8400-e29b-41d4-a716-446655440001",
+        "timestamp": "2026-08-21T14:00:00.000Z",
+        "method": "tools/call",
+        "toolName": "verify_identity",
+        "namespace": "auth",
+        "upstream": "identity-server",
+        "principal": "user:dave@example.com",
+        "durationMs": 55,
+        "success": true,
+        "previousHash": "genesis",
+        "attestation": "sig_aaa111"
+      },
+      "canonical": "[[\"id\",\"770e8400-e29b-41d4-a716-446655440001\"],[\"timestamp\",\"2026-08-21T14:00:00.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"verify_identity\"],[\"namespace\",\"auth\"],[\"upstream\",\"identity-server\"],[\"principal\",\"user:dave@example.com\"],[\"durationMs\",55],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"]]",
+      "sha256_canonical": "0443b29e0a27962c296cd4e854f954491213515426eb0d25adc773c463e02e00",
+      "full_record_json": "{\"id\":\"770e8400-e29b-41d4-a716-446655440001\",\"timestamp\":\"2026-08-21T14:00:00.000Z\",\"method\":\"tools/call\",\"toolName\":\"verify_identity\",\"namespace\":\"auth\",\"upstream\":\"identity-server\",\"principal\":\"user:dave@example.com\",\"durationMs\":55,\"success\":true,\"previousHash\":\"genesis\",\"attestation\":\"sig_aaa111\"}",
+      "record_hash": "16943a93113fe9895979585a6a972a12eca7d94a67370a8abd8eefa52deafdac"
+    },
+    "record_b": {
+      "record": {
+        "id": "770e8400-e29b-41d4-a716-446655440001",
+        "timestamp": "2026-08-21T14:00:00.000Z",
+        "method": "tools/call",
+        "toolName": "verify_identity",
+        "namespace": "auth",
+        "upstream": "identity-server",
+        "principal": "user:dave@example.com",
+        "durationMs": 55,
+        "success": true,
+        "previousHash": "genesis",
+        "attestation": "sig_bbb222"
+      },
+      "canonical": "[[\"id\",\"770e8400-e29b-41d4-a716-446655440001\"],[\"timestamp\",\"2026-08-21T14:00:00.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"verify_identity\"],[\"namespace\",\"auth\"],[\"upstream\",\"identity-server\"],[\"principal\",\"user:dave@example.com\"],[\"durationMs\",55],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"]]",
+      "sha256_canonical": "0443b29e0a27962c296cd4e854f954491213515426eb0d25adc773c463e02e00",
+      "full_record_json": "{\"id\":\"770e8400-e29b-41d4-a716-446655440001\",\"timestamp\":\"2026-08-21T14:00:00.000Z\",\"method\":\"tools/call\",\"toolName\":\"verify_identity\",\"namespace\":\"auth\",\"upstream\":\"identity-server\",\"principal\":\"user:dave@example.com\",\"durationMs\":55,\"success\":true,\"previousHash\":\"genesis\",\"attestation\":\"sig_bbb222\"}",
+      "record_hash": "770efbb50562d529f271f94b26f373749ddfda9936f4305a5ec2c4a256bf24b7"
+    },
+    "assertions": {
+      "canonical_hashes_match": true,
+      "chain_hashes_differ": true
+    }
+  }
+}

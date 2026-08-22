@@ -79,6 +79,53 @@ describe("decisionContextDigest in signatures", () => {
   });
 });
 
+describe("parties in signatures", () => {
+  const secret = "c".repeat(64);
+  const signer = new HmacSigner(secret);
+
+  const recordWithParties: AuditRecord = {
+    ...mockRecord,
+    id: "test-uuid-parties-001",
+    parties: [
+      { party: "gateway", role: "witness", scope: ["id", "timestamp", "method", "toolName", "namespace", "upstream", "principal", "durationMs", "success", "errorCode", "previousHash"] },
+    ],
+  };
+
+  it("includes parties in signature when present", async () => {
+    const sigWith = await signer.sign(recordWithParties);
+    const sigWithout = await signer.sign(mockRecord);
+    expect(sigWith).not.toBe(sigWithout);
+  });
+
+  it("verifies record with parties", async () => {
+    const sig = await signer.sign(recordWithParties);
+    const valid = await signer.verify(recordWithParties, sig);
+    expect(valid).toBe(true);
+  });
+
+  it("rejects tampered parties", async () => {
+    const sig = await signer.sign(recordWithParties);
+    const tampered = { ...recordWithParties, parties: [{ party: "attacker", role: "asserter" as const, scope: ["*"] }] };
+    const valid = await signer.verify(tampered, sig);
+    expect(valid).toBe(false);
+  });
+
+  it("handles both decisionContextDigest and parties together", async () => {
+    const dual: AuditRecord = {
+      ...recordWithParties,
+      id: "test-uuid-parties-002",
+      decisionContextDigest: "e".repeat(64),
+      parties: [
+        { party: "gateway", role: "witness", scope: ["id", "timestamp", "method"] },
+        { party: "policy-engine", role: "asserter", scope: ["decisionContextDigest"] },
+      ],
+    };
+    const sig = await signer.sign(dual);
+    const valid = await signer.verify(dual, sig);
+    expect(valid).toBe(true);
+  });
+});
+
 describe("Ed25519Signer", () => {
   it("signs and verifies a record", async () => {
     const signer = new Ed25519Signer();

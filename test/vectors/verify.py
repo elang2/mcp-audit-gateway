@@ -24,6 +24,11 @@ def canonicalize(record: dict) -> str:
     for key in FIELD_ORDER:
         value = record.get(key)
         ordered.append([key, value])
+    if record.get("decisionContextDigest") is not None:
+        ordered.insert(10, ["decisionContextDigest", record["decisionContextDigest"]])
+    if record.get("parties") is not None:
+        insert_at = 12 if record.get("decisionContextDigest") is not None else 11
+        ordered.insert(insert_at, ["parties", record["parties"]])
     return json.dumps(ordered, separators=(",", ":"), ensure_ascii=False)
 
 
@@ -166,6 +171,30 @@ if demo["assertions"]["chain_hashes_differ"] is True:
 else:
     print("  FAIL: assertions.chain_hashes_differ should be true")
     failed += 1
+
+# --- Party Attribution vectors ---
+if "party_attribution" in vectors:
+    print("\n=== Party Attribution Vectors ===\n")
+
+    for v in vectors["party_attribution"]["vectors"]:
+        canonical = canonicalize(v["record"])
+        h = sha256_hex(canonical)
+
+        canon_match = canonical == v["canonical"]
+        hash_match = h == v["sha256_canonical"]
+
+        if canon_match and hash_match:
+            print(f"  PASS: {v['name']}")
+            passed += 1
+        else:
+            print(f"  FAIL: {v['name']}")
+            if not canon_match:
+                print(f"    canonical expected: {v['canonical']}")
+                print(f"    canonical got:      {canonical}")
+            if not hash_match:
+                print(f"    hash expected: {v['sha256_canonical']}")
+                print(f"    hash got:      {h}")
+            failed += 1
 
 # --- Summary ---
 print(f"\n=== Results: {passed} passed, {failed} failed ===")

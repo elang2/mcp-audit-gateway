@@ -14,6 +14,13 @@ function sha256Hex(input) {
 
 function canonicalizeFromRecord(record, fieldOrder) {
   const ordered = fieldOrder.map((key) => [key, record[key] ?? null]);
+  if (record.decisionContextDigest != null) {
+    ordered.splice(10, 0, ["decisionContextDigest", record.decisionContextDigest]);
+  }
+  if (record.parties != null) {
+    const insertAt = record.decisionContextDigest != null ? 12 : 11;
+    ordered.splice(insertAt, 0, ["parties", record.parties]);
+  }
   return JSON.stringify(ordered);
 }
 
@@ -163,6 +170,35 @@ if (demo.assertions.chain_hashes_differ === true) {
 } else {
   console.log("  FAIL: assertions.chain_hashes_differ should be true");
   failed++;
+}
+
+// --- Party Attribution vectors ---
+if (vectors.party_attribution) {
+  console.log("\n=== Party Attribution Vectors ===\n");
+
+  for (const v of vectors.party_attribution.vectors) {
+    const canonical = canonicalizeFromRecord(v.record, vectors.field_order);
+    const hash = sha256Hex(canonical);
+
+    const canonMatch = canonical === v.canonical;
+    const hashMatch = hash === v.sha256_canonical;
+
+    if (canonMatch && hashMatch) {
+      console.log(`  PASS: ${v.name}`);
+      passed++;
+    } else {
+      console.log(`  FAIL: ${v.name}`);
+      if (!canonMatch) {
+        console.log(`    canonical expected: ${v.canonical}`);
+        console.log(`    canonical got:      ${canonical}`);
+      }
+      if (!hashMatch) {
+        console.log(`    hash expected: ${v.sha256_canonical}`);
+        console.log(`    hash got:      ${hash}`);
+      }
+      failed++;
+    }
+  }
 }
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

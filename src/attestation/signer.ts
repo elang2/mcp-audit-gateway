@@ -77,7 +77,7 @@ export class Ed25519Signer implements Signer {
 }
 
 function canonicalizeRecord(record: AuditRecord): string {
-  const ordered: [string, string | number | boolean | null][] = [
+  const ordered: [string, string | number | boolean | null | unknown][] = [
     ["id", record.id],
     ["timestamp", record.timestamp],
     ["method", record.method],
@@ -92,6 +92,10 @@ function canonicalizeRecord(record: AuditRecord): string {
   ];
   if (record.decisionContextDigest != null) {
     ordered.splice(10, 0, ["decisionContextDigest", record.decisionContextDigest]);
+  }
+  if (record.parties != null) {
+    const insertAt = record.decisionContextDigest != null ? 12 : 11;
+    ordered.splice(insertAt, 0, ["parties", record.parties]);
   }
   return JSON.stringify(ordered);
 }

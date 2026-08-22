@@ -1,7 +1,27 @@
 import { appendFile, stat, rename, open } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
-import type { AuditRecord } from "../types.js";
+import type { AuditRecord, PartyAttribution } from "../types.js";
 import type { Signer } from "./signer.js";
+
+const GATEWAY_WITNESSED_FIELDS = [
+  "id", "timestamp", "method", "toolName", "namespace",
+  "upstream", "principal", "durationMs", "success", "errorCode",
+  "previousHash",
+];
+
+function buildParties(hasDecisionContext: boolean): PartyAttribution[] {
+  const parties: PartyAttribution[] = [
+    { party: "gateway", role: "witness", scope: GATEWAY_WITNESSED_FIELDS },
+  ];
+  if (hasDecisionContext) {
+    parties.push({
+      party: "policy-engine",
+      role: "asserter",
+      scope: ["decisionContextDigest"],
+    });
+  }
+  return parties;
+}
 
 export function hashRecord(record: AuditRecord): string {
   const json = JSON.stringify(record);
@@ -62,6 +82,7 @@ export class AuditLog {
       timestamp: new Date().toISOString(),
       method,
       ...opts,
+      parties: buildParties(opts.decisionContextDigest != null),
       previousHash: this.lastHash,
     };
 

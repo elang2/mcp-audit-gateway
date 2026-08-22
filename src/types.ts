@@ -87,6 +87,12 @@ export interface UpstreamStatus {
   unavailableReason?: string;
 }
 
+export interface PartyAttribution {
+  party: string;
+  role: "witness" | "asserter";
+  scope: string[];
+}
+
 export interface AuditRecord {
   id: string;
   timestamp: string;
@@ -99,6 +105,7 @@ export interface AuditRecord {
   success: boolean;
   errorCode?: number;
   decisionContextDigest?: string;
+  parties?: PartyAttribution[];
   previousHash?: string;
   attestation?: string;
 }

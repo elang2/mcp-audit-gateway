@@ -25,6 +25,7 @@ const config: GatewayConfig = {
   attestation: { enabled: true, algorithm: "hmac-sha256", secret: "c".repeat(64), includeParams: false, includeResult: false },
   telemetry: { enabled: false, serviceName: "test", sampleRate: 0 },
   auditLog: { enabled: true, path: AUDIT_PATH, rotateAfterMb: 10 },
+  checkpoint: { enabled: false, intervalRecords: 100, intervalSeconds: 60, trigger: "whichever_first" as const },
 };
 
 describe("Integration: Gateway with in-memory MCP server", () => {

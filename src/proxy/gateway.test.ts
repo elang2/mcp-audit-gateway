@@ -26,6 +26,7 @@ const testConfig: GatewayConfig = {
   attestation: { enabled: true, algorithm: "hmac-sha256", secret: "a".repeat(64), includeParams: false, includeResult: false },
   telemetry: { enabled: false, serviceName: "test", sampleRate: 0 },
   auditLog: { enabled: true, path: "/tmp/test-audit.jsonl", rotateAfterMb: 10 },
+  checkpoint: { enabled: false, intervalRecords: 100, intervalSeconds: 60, trigger: "whichever_first" as const },
 };
 
 describe("Gateway", () => {

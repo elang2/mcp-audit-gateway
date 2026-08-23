@@ -48,6 +48,13 @@ export const TelemetryConfigSchema = z.object({
   sampleRate: z.number().min(0).max(1).default(1.0),
 });
 
+export const CheckpointConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  intervalRecords: z.number().positive().default(100),
+  intervalSeconds: z.number().positive().default(60),
+  trigger: z.enum(["records", "time", "whichever_first"]).default("whichever_first"),
+});
+
 export const GatewayConfigSchema = z.object({
   name: z.string().default("mcp-audit-gateway"),
   version: z.string().default("0.1.0"),
@@ -69,6 +76,7 @@ export const GatewayConfigSchema = z.object({
     path: z.string().default("./audit.jsonl"),
     rotateAfterMb: z.number().positive().default(100),
   }).default({}),
+  checkpoint: CheckpointConfigSchema.default({}),
 });
 
 export type UpstreamConfig = z.infer<typeof UpstreamConfigSchema>;
@@ -105,9 +113,42 @@ export interface AuditRecord {
   success: boolean;
   errorCode?: number;
   decisionContextDigest?: string;
+  extensionsDigest?: string;
   parties?: PartyAttribution[];
   previousHash?: string;
   attestation?: string;
+}
+
+export interface CheckpointRecord {
+  id: string;
+  type: "checkpoint";
+  timestamp: string;
+  sequence: number;
+  recordCount: number;
+  previousHash: string;
+  parties?: PartyAttribution[];
+  attestation?: string;
+}
+
+export interface ChainBreakRecord {
+  id: string;
+  type: "chain_break";
+  timestamp: string;
+  reason: string;
+  priorHead?: string;
+  priorSequence?: number;
+  priorRecordCount?: number;
+  attestation?: string;
+}
+
+export type ChainRecord = AuditRecord | CheckpointRecord | ChainBreakRecord;
+
+export function isCheckpoint(record: ChainRecord): record is CheckpointRecord {
+  return "type" in record && (record as CheckpointRecord).type === "checkpoint";
+}
+
+export function isChainBreak(record: ChainRecord): record is ChainBreakRecord {
+  return "type" in record && (record as ChainBreakRecord).type === "chain_break";
 }
 
 export interface ToolEntry {

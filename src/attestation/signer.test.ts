@@ -156,4 +156,18 @@ describe("Ed25519Signer", () => {
     expect(pubKey).not.toBeNull();
     expect(pubKey!.length).toBe(32);
   });
+
+  it("rejects signature from a different key (signature substitution)", async () => {
+    const signerA = new Ed25519Signer();
+    await signerA.init();
+    const signerB = new Ed25519Signer();
+    await signerB.init();
+
+    const sigFromA = await signerA.sign(mockRecord);
+    const validOnA = await signerA.verify(mockRecord, sigFromA);
+    expect(validOnA).toBe(true);
+
+    const validOnB = await signerB.verify(mockRecord, sigFromA);
+    expect(validOnB).toBe(false);
+  });
 });

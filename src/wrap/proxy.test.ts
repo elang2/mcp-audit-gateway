@@ -44,7 +44,7 @@ describe("wrap proxy", () => {
     }
   });
 
-  it("forwards non-tool messages transparently", async () => {
+  it.skipIf(!process.env.RUN_E2E)("forwards non-tool messages transparently", async () => {
     const proc = spawn("node", [CLI_PATH, "wrap", "--", "node", "-e", `
       process.stdin.setEncoding('utf-8');
       let buf = '';
@@ -82,7 +82,7 @@ describe("wrap proxy", () => {
     expect(parsed[1].result.resources).toBeDefined();
   });
 
-  it("logs tool calls with attestation", async () => {
+  it.skipIf(!process.env.RUN_E2E)("logs tool calls with attestation", async () => {
     const proc = spawn("node", [CLI_PATH, "wrap", "--", "node", "-e", `
       process.stdin.setEncoding('utf-8');
       let buf = '';

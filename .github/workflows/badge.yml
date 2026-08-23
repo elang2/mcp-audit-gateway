@@ -1,0 +1,74 @@
+name: Update Compatibility Badge
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'test/vectors/**'
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-badge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Run tests and generate badge data
+        run: |
+          chmod +x test/vectors/cross-sdk-diff.sh
+          JSON=$(test/vectors/cross-sdk-diff.sh --json 2>/dev/null) || true
+          STATS=$(echo "$JSON" | python3 -c "
+          import sys, json
+          d = json.loads(sys.stdin.read())
+          total = len(d)
+          agree = sum(1 for x in d if x['agree'])
+          langs = len(list(d[0]['results'].keys()))
+          print(f'{agree}/{total} agree | {langs} langs')
+          ")
+          echo "BADGE_MESSAGE=$STATS" >> $GITHUB_ENV
+
+      - name: Create badge JSON
+        run: |
+          mkdir -p .github/badges
+          cat > .github/badges/cross-sdk.json << EOF
+          {
+            "schemaVersion": 1,
+            "label": "MCP cross-SDK",
+            "message": "${{ env.BADGE_MESSAGE }}",
+            "color": "blue"
+          }
+          EOF
+
+      - name: Commit badge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/badges/cross-sdk.json
+          git diff --staged --quiet || git commit -m "chore: update cross-sdk badge"
+          git push || true

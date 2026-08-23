@@ -1,0 +1,110 @@
+{
+  "description": "MCP protocol-level behavioral test vectors. These test SDK handling of protocol semantics, not just JSON serialization.",
+  "version": "0.1.0",
+  "vectors": [
+    {
+      "id": "request_id_integer_preserved",
+      "category": "correlation",
+      "description": "Server must echo the exact request ID type (integer stays integer)",
+      "send": {"jsonrpc": "2.0", "id": 1, "method": "ping"},
+      "expect": {"response_id_type": "integer", "response_id_value": 1},
+      "spec_ref": "JSON-RPC 2.0 §4.1: id MUST be the same value in Response",
+      "severity": "high"
+    },
+    {
+      "id": "request_id_string_preserved",
+      "category": "correlation",
+      "description": "Server must echo the exact request ID type (string stays string)",
+      "send": {"jsonrpc": "2.0", "id": "abc-123", "method": "ping"},
+      "expect": {"response_id_type": "string", "response_id_value": "abc-123"},
+      "spec_ref": "JSON-RPC 2.0 §4.1",
+      "severity": "high"
+    },
+    {
+      "id": "unknown_method_error_code",
+      "category": "error_handling",
+      "description": "Unknown method must return -32601 (Method not found)",
+      "send": {"jsonrpc": "2.0", "id": 5, "method": "nonexistent/method", "params": {}},
+      "expect": {"error_code": -32601},
+      "actual_ts_sdk": {"error_code": -32603, "note": "TS SDK returns Internal Error instead of Method Not Found"},
+      "spec_ref": "JSON-RPC 2.0 §5.1",
+      "severity": "high"
+    },
+    {
+      "id": "batch_request_handling",
+      "category": "protocol",
+      "description": "JSON-RPC batch (array of requests) — does the SDK respond with array or reject?",
+      "send": [
+        {"jsonrpc": "2.0", "id": 1, "method": "ping"},
+        {"jsonrpc": "2.0", "id": 2, "method": "ping"}
+      ],
+      "expect": {"behavior": "array_response_or_parse_error"},
+      "note": "MCP spec does not mention batch support. JSON-RPC 2.0 defines it. SDKs disagree.",
+      "spec_ref": "JSON-RPC 2.0 §6 (Batch)",
+      "severity": "medium"
+    },
+    {
+      "id": "null_request_id",
+      "category": "correlation",
+      "description": "Request with id:null — notification or request?",
+      "send": {"jsonrpc": "2.0", "id": null, "method": "tools/list"},
+      "expect": {"behavior_options": ["treat_as_notification_no_response", "respond_with_id_null"]},
+      "note": "JSON-RPC says id:null means unknown ID. Security: confused deputy if responses route wrong.",
+      "spec_ref": "JSON-RPC 2.0 §4.1",
+      "severity": "medium"
+    },
+    {
+      "id": "notification_before_initialized",
+      "category": "lifecycle",
+      "description": "Server sends notifications/tools/list_changed before client sends initialized",
+      "sequence": [
+        {"direction": "client->server", "message": {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0"}}}},
+        {"direction": "server->client", "message": {"jsonrpc": "2.0", "id": 1, "result": {"protocolVersion": "2025-03-26", "capabilities": {"tools": {}}, "serverInfo": {"name": "test", "version": "1.0"}}}},
+        {"direction": "server->client", "message": {"jsonrpc": "2.0", "method": "notifications/tools/list_changed"}, "note": "Before client sends initialized notification"},
+        {"direction": "client->server", "message": {"jsonrpc": "2.0", "method": "notifications/initialized"}}
+      ],
+      "expect": {"behavior_options": ["dispatch_immediately", "queue_until_initialized", "drop_silently", "error"]},
+      "actual_ts_sdk": "dispatch_immediately (no init gating in _onnotification)",
+      "severity": "high"
+    },
+    {
+      "id": "duplicate_json_keys",
+      "category": "security",
+      "description": "Duplicate keys in a JSON-RPC message — which value wins?",
+      "send_raw": "{\"jsonrpc\":\"2.0\",\"id\":1,\"id\":2,\"method\":\"tools/list\"}",
+      "expect": {"behavior_options": ["first_key_wins", "last_key_wins", "error"]},
+      "note": "Request smuggling vector: proxy and backend disagree on which key to use",
+      "spec_ref": "RFC 7159 §4: names within an object SHOULD be unique (not MUST)",
+      "severity": "high"
+    },
+    {
+      "id": "oversized_input_schema",
+      "category": "security",
+      "description": "Tool definition with 10000 properties — does the SDK parse, OOM, or reject?",
+      "setup": "Register a tool whose inputSchema.properties has 10000 entries",
+      "expect": {"behavior_options": ["parse_normally", "timeout", "oom", "reject_with_error"]},
+      "note": "Denial of service: malicious server can crash clients with huge schemas",
+      "severity": "medium"
+    },
+    {
+      "id": "progress_token_type_preservation",
+      "category": "protocol",
+      "description": "Progress token must be preserved as-is (string stays string, number stays number)",
+      "sequence": [
+        {"direction": "client->server", "message": {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "slow_tool", "arguments": {}, "_meta": {"progressToken": "abc-123"}}}},
+        {"direction": "server->client", "message": {"jsonrpc": "2.0", "method": "notifications/progress", "params": {"progressToken": "abc-123", "progress": 50, "total": 100}}}
+      ],
+      "expect": {"progressToken_preserved": true, "type_preserved": true},
+      "severity": "medium"
+    },
+    {
+      "id": "resource_uri_path_traversal",
+      "category": "security",
+      "description": "Does the SDK normalize URIs or pass raw (including ../ traversal) to the handler?",
+      "send": {"jsonrpc": "2.0", "id": 1, "method": "resources/read", "params": {"uri": "file:///../../../etc/passwd"}},
+      "expect": {"behavior_options": ["normalize_path", "pass_raw_to_handler", "reject_with_error"]},
+      "note": "If SDK passes raw URIs, every server must re-implement traversal protection",
+      "severity": "high"
+    }
+  ]
+}

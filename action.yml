@@ -1,0 +1,101 @@
+name: 'MCP Cross-SDK Differential Test'
+description: 'Run cross-SDK serialization differential tests for MCP protocol compliance'
+author: 'Elankumaran Srinivasan'
+
+branding:
+  icon: 'check-circle'
+  color: 'blue'
+
+inputs:
+  languages:
+    description: 'Comma-separated list of languages to test (default: all available)'
+    required: false
+    default: 'all'
+  json-output:
+    description: 'Output results as JSON'
+    required: false
+    default: 'false'
+  fail-on-divergence:
+    description: 'Fail the action if any divergences are found'
+    required: false
+    default: 'true'
+
+outputs:
+  divergences:
+    description: 'Number of divergences found'
+    value: ${{ steps.run.outputs.divergences }}
+  total-tests:
+    description: 'Total number of tests run'
+    value: ${{ steps.run.outputs.total }}
+  results-json:
+    description: 'Full JSON results'
+    value: ${{ steps.run.outputs.json }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.3'
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+
+    - name: Run differential tests
+      id: run
+      shell: bash
+      run: |
+        chmod +x ${{ github.action_path }}/test/vectors/cross-sdk-diff.sh
+        JSON=$(${{ github.action_path }}/test/vectors/cross-sdk-diff.sh --json 2>/dev/null) || true
+        DIVERGENCES=$(echo "$JSON" | python3 -c "import sys,json; d=json.loads(sys.stdin.read()); print(sum(1 for x in d if not x['agree']))")
+        TOTAL=$(echo "$JSON" | python3 -c "import sys,json; d=json.loads(sys.stdin.read()); print(len(d))")
+        echo "divergences=$DIVERGENCES" >> $GITHUB_OUTPUT
+        echo "total=$TOTAL" >> $GITHUB_OUTPUT
+        DELIM="EOF_$(head -c 16 /dev/urandom | base64 | tr -d '=+/\n')"
+        echo "json<<$DELIM" >> $GITHUB_OUTPUT
+        echo "$JSON" >> $GITHUB_OUTPUT
+        echo "$DELIM" >> $GITHUB_OUTPUT
+
+        if [ "${{ inputs.json-output }}" = "true" ]; then
+          echo "$JSON"
+        else
+          ${{ github.action_path }}/test/vectors/cross-sdk-diff.sh 2>&1 || true
+        fi
+
+    - name: Generate results matrix
+      if: always()
+      shell: bash
+      run: |
+        chmod +x ${{ github.action_path }}/test/vectors/generate-matrix.sh
+        ${{ github.action_path }}/test/vectors/generate-matrix.sh > ${{ github.workspace }}/mcp-diff-results.md
+        cat ${{ github.workspace }}/mcp-diff-results.md >> $GITHUB_STEP_SUMMARY
+
+    - name: Check divergence threshold
+      if: always()
+      shell: bash
+      run: |
+        DIVERGENCES="${{ steps.run.outputs.divergences }}"
+        TOTAL="${{ steps.run.outputs.total }}"
+        if [ "${{ inputs.fail-on-divergence }}" = "true" ] && [ "$DIVERGENCES" -gt "0" ]; then
+          echo "::error::Found $DIVERGENCES divergences across $TOTAL tests"
+          exit 1
+        fi

@@ -7,7 +7,8 @@
   "types": "dist/index.d.ts",
   "bin": {
     "mcp-audit": "dist/cli.js",
-    "mcp-audit-gateway": "dist/cli.js"
+    "mcp-audit-gateway": "dist/cli.js",
+    "mcp-diff": "bin/mcp-diff.js"
   },
   "scripts": {
     "build": "tsc",
@@ -23,7 +24,11 @@
     "audit",
     "attestation",
     "opentelemetry",
-    "proxy"
+    "proxy",
+    "cross-sdk",
+    "differential-testing",
+    "conformance",
+    "interoperability"
   ],
   "author": "Elankumaran Srinivasan",
   "license": "MIT",

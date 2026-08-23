@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "mcp-audit-gateway"
+authors:
+  - family-names: Srinivasan
+    given-names: Elankumaran
+    orcid: ""
+repository-code: "https://github.com/elang2/mcp-audit-gateway"
+license: Apache-2.0
+preferred-citation:
+  type: article
+  title: "Tamper-Evident Audit Trails for AI Agent Tool Invocations: Design Pitfalls, Cross-Language Conformance, and a Reference Implementation"
+  authors:
+    - family-names: Srinivasan
+      given-names: Elankumaran
+  year: 2026
+  month: 8
+  doi: "10.5281/zenodo.22070815"
+  url: "https://doi.org/10.5281/zenodo.22070815"

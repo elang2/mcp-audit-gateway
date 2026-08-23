@@ -1,5 +1,7 @@
 # mcp-audit
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22070815.svg)](https://doi.org/10.5281/zenodo.22070815)
+
 Your AI agent made 847 tool calls yesterday. Can you verify what it did?
 
 Tamper-evident audit trail for AI agent tool calls.

@@ -90,9 +90,9 @@ func main() {
 		{"unicode_bmp_escape", serialize(" ")},
 		{"unicode_surrogate_pair", serialize("😀")},
 
-		// Object structure (Go SDK still sorts map keys via encoding/json)
-		{"key_order_ba", orderedObj("b", 1, "a", 2)},
-		{"key_numeric_strings", orderedObj("2", "b", "1", "a", "10", "c")},
+		// Object structure — Go SDK sorts map keys lexicographically
+		{"key_order_ba", serialize(map[string]interface{}{"b": 1, "a": 2})},
+		{"key_numeric_strings", serialize(map[string]interface{}{"2": "b", "1": "a", "10": "c"})},
 		{"nested_depth", serialize(map[string]interface{}{"a": map[string]interface{}{"b": map[string]interface{}{"c": map[string]interface{}{"d": 1}}}})},
 		{"empty_nested", orderedObj("a", map[string]interface{}{}, "b", []interface{}{})},
 

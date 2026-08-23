@@ -98,6 +98,7 @@ export class McpServerAdapter {
             content: upstreamResult?.content ?? [{ type: "text" as const, text: JSON.stringify(result) }],
             isError: upstreamResult?.isError,
             _meta: {
+              ...(aiInvocation?.turnId ? { "io.modelcontextprotocol/aiInvocation": { turnId: aiInvocation.turnId } } : {}),
               "x-gateway-attestation/v1": {
                 auditId: auditRecord.id,
                 attestation: auditRecord.attestation,
@@ -111,6 +112,7 @@ export class McpServerAdapter {
               content: [{ type: "text" as const, text: err.message }],
               isError: true,
               _meta: {
+                ...(aiInvocation?.turnId ? { "io.modelcontextprotocol/aiInvocation": { turnId: aiInvocation.turnId } } : {}),
                 "x-gateway-attestation/v1": {
                   auditId: err.auditRecord.id,
                   attestation: err.auditRecord.attestation,
@@ -149,7 +151,11 @@ export class McpServerAdapter {
     if (!inv) return undefined;
     const result: { turnId?: string; invocationReason?: string; model?: string } = {};
     if (typeof inv.turnId === "string") result.turnId = inv.turnId;
-    if (typeof inv.invocationReason === "string") result.invocationReason = inv.invocationReason;
+    if (typeof inv.invocationReason === "string") {
+      result.invocationReason = inv.invocationReason;
+    } else if (inv.invocationReason && typeof (inv.invocationReason as Record<string, unknown>).text === "string") {
+      result.invocationReason = (inv.invocationReason as Record<string, unknown>).text as string;
+    }
     if (typeof inv.model === "string") {
       result.model = inv.model;
     } else if (inv.model && typeof (inv.model as Record<string, unknown>).name === "string") {

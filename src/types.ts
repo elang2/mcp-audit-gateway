@@ -55,6 +55,11 @@ export const CheckpointConfigSchema = z.object({
   trigger: z.enum(["records", "time", "whichever_first"]).default("whichever_first"),
 });
 
+export const ToolIntegrityConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  action: z.enum(["record", "record_and_block"]).default("record"),
+});
+
 export const GatewayConfigSchema = z.object({
   name: z.string().default("mcp-audit-gateway"),
   version: z.string().default("0.1.0"),
@@ -77,6 +82,7 @@ export const GatewayConfigSchema = z.object({
     rotateAfterMb: z.number().positive().default(100),
   }).default({}),
   checkpoint: CheckpointConfigSchema.default({}),
+  toolIntegrity: ToolIntegrityConfigSchema.default({}),
 });
 
 export type UpstreamConfig = z.infer<typeof UpstreamConfigSchema>;
@@ -148,7 +154,20 @@ export interface ChainBreakRecord {
   attestation?: string;
 }
 
-export type ChainRecord = AuditRecord | CheckpointRecord | ChainBreakRecord;
+export interface ToolDriftRecord {
+  id: string;
+  type: "tool_drift";
+  timestamp: string;
+  toolName: string;
+  namespace: string;
+  previousDefinitionDigest: string;
+  newDefinitionDigest: string;
+  detectedAtRecord: number;
+  previousHash: string;
+  attestation?: string;
+}
+
+export type ChainRecord = AuditRecord | CheckpointRecord | ChainBreakRecord | ToolDriftRecord;
 
 export function isCheckpoint(record: ChainRecord): record is CheckpointRecord {
   return "type" in record && (record as CheckpointRecord).type === "checkpoint";
@@ -156,6 +175,10 @@ export function isCheckpoint(record: ChainRecord): record is CheckpointRecord {
 
 export function isChainBreak(record: ChainRecord): record is ChainBreakRecord {
   return "type" in record && (record as ChainBreakRecord).type === "chain_break";
+}
+
+export function isToolDrift(record: ChainRecord): record is ToolDriftRecord {
+  return "type" in record && (record as ToolDriftRecord).type === "tool_drift";
 }
 
 export interface ToolEntry {

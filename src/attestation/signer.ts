@@ -1,10 +1,10 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import type { AttestationConfig, AuditRecord, CheckpointRecord, ChainBreakRecord, ChainRecord } from "../types.js";
-import { isCheckpoint, isChainBreak } from "../types.js";
+import type { AttestationConfig, AuditRecord, CheckpointRecord, ChainBreakRecord, ToolDriftRecord, ChainRecord } from "../types.js";
+import { isCheckpoint, isChainBreak, isToolDrift } from "../types.js";
 
 export interface Signer {
-  sign(record: AuditRecord | CheckpointRecord | ChainBreakRecord): Promise<string>;
-  verify(record: AuditRecord | CheckpointRecord | ChainBreakRecord, signature: string): Promise<boolean>;
+  sign(record: AuditRecord | CheckpointRecord | ChainBreakRecord | ToolDriftRecord): Promise<string>;
+  verify(record: AuditRecord | CheckpointRecord | ChainBreakRecord | ToolDriftRecord, signature: string): Promise<boolean>;
 }
 
 export class HmacSigner implements Signer {
@@ -14,18 +14,20 @@ export class HmacSigner implements Signer {
     this.secret = Buffer.from(secret, "hex");
   }
 
-  async sign(record: AuditRecord | CheckpointRecord | ChainBreakRecord): Promise<string> {
-    const payload = isChainBreak(record)
-      ? canonicalizeChainBreak(record)
-      : isCheckpoint(record)
-        ? canonicalizeCheckpoint(record)
-        : canonicalizeRecord(record);
+  async sign(record: AuditRecord | CheckpointRecord | ChainBreakRecord | ToolDriftRecord): Promise<string> {
+    const payload = isToolDrift(record)
+      ? canonicalizeToolDrift(record)
+      : isChainBreak(record)
+        ? canonicalizeChainBreak(record)
+        : isCheckpoint(record)
+          ? canonicalizeCheckpoint(record)
+          : canonicalizeRecord(record);
     const hmac = createHmac("sha256", this.secret);
     hmac.update(payload);
     return hmac.digest("hex");
   }
 
-  async verify(record: AuditRecord | CheckpointRecord | ChainBreakRecord, signature: string): Promise<boolean> {
+  async verify(record: AuditRecord | CheckpointRecord | ChainBreakRecord | ToolDriftRecord, signature: string): Promise<boolean> {
     const expected = await this.sign(record);
     const expectedBuf = Buffer.from(expected, "hex");
     const signatureBuf = Buffer.from(signature, "hex");
@@ -52,27 +54,31 @@ export class Ed25519Signer implements Signer {
     this.publicKey = await ed.getPublicKeyAsync(this.privateKey);
   }
 
-  async sign(record: AuditRecord | CheckpointRecord | ChainBreakRecord): Promise<string> {
+  async sign(record: AuditRecord | CheckpointRecord | ChainBreakRecord | ToolDriftRecord): Promise<string> {
     if (!this.privateKey) await this.init();
     const ed = await import("@noble/ed25519");
-    const canonical = isChainBreak(record)
-      ? canonicalizeChainBreak(record)
-      : isCheckpoint(record)
-        ? canonicalizeCheckpoint(record)
-        : canonicalizeRecord(record);
+    const canonical = isToolDrift(record)
+      ? canonicalizeToolDrift(record)
+      : isChainBreak(record)
+        ? canonicalizeChainBreak(record)
+        : isCheckpoint(record)
+          ? canonicalizeCheckpoint(record)
+          : canonicalizeRecord(record);
     const payload = new TextEncoder().encode(canonical);
     const sig = await ed.signAsync(payload, this.privateKey!);
     return Buffer.from(sig).toString("hex");
   }
 
-  async verify(record: AuditRecord | CheckpointRecord | ChainBreakRecord, signature: string): Promise<boolean> {
+  async verify(record: AuditRecord | CheckpointRecord | ChainBreakRecord | ToolDriftRecord, signature: string): Promise<boolean> {
     if (!this.publicKey) await this.init();
     const ed = await import("@noble/ed25519");
-    const canonical = isChainBreak(record)
-      ? canonicalizeChainBreak(record)
-      : isCheckpoint(record)
-        ? canonicalizeCheckpoint(record)
-        : canonicalizeRecord(record);
+    const canonical = isToolDrift(record)
+      ? canonicalizeToolDrift(record)
+      : isChainBreak(record)
+        ? canonicalizeChainBreak(record)
+        : isCheckpoint(record)
+          ? canonicalizeCheckpoint(record)
+          : canonicalizeRecord(record);
     const payload = new TextEncoder().encode(canonical);
     const sig = Buffer.from(signature, "hex");
     return ed.verifyAsync(sig, payload, this.publicKey!);
@@ -180,6 +186,29 @@ export function canonicalizeChainBreak(record: ChainBreakRecord): string {
     ["priorHead", record.priorHead ?? null],
     ["priorSequence", record.priorSequence ?? null],
     ["priorRecordCount", record.priorRecordCount ?? null],
+  ];
+  return JSON.stringify(ordered);
+}
+
+export function canonicalizeToolDrift(record: ToolDriftRecord): string {
+  assertWellFormedString(record.id, "canonicalizeToolDrift.id");
+  assertWellFormedString(record.timestamp, "canonicalizeToolDrift.timestamp");
+  assertWellFormedString(record.toolName, "canonicalizeToolDrift.toolName");
+  assertWellFormedString(record.namespace, "canonicalizeToolDrift.namespace");
+  assertWellFormedString(record.previousDefinitionDigest, "canonicalizeToolDrift.previousDefinitionDigest");
+  assertWellFormedString(record.newDefinitionDigest, "canonicalizeToolDrift.newDefinitionDigest");
+  assertWellFormedString(record.previousHash, "canonicalizeToolDrift.previousHash");
+
+  const ordered: [string, string | number][] = [
+    ["id", record.id],
+    ["type", "tool_drift"],
+    ["timestamp", record.timestamp],
+    ["toolName", record.toolName],
+    ["namespace", record.namespace],
+    ["previousDefinitionDigest", record.previousDefinitionDigest],
+    ["newDefinitionDigest", record.newDefinitionDigest],
+    ["detectedAtRecord", record.detectedAtRecord],
+    ["previousHash", record.previousHash],
   ];
   return JSON.stringify(ordered);
 }

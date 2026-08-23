@@ -18,13 +18,24 @@ export interface UpstreamConnection {
   reconnectTimer?: ReturnType<typeof setTimeout>;
 }
 
+export type ToolsRefreshCallback = (
+  upstreamName: string,
+  namespace: string,
+  tools: UpstreamConnection["tools"],
+) => void | Promise<void>;
+
 export class UpstreamManager {
   private connections: Map<string, UpstreamConnection> = new Map();
   private healthCheckInterval?: ReturnType<typeof setInterval>;
+  private onToolsRefresh?: ToolsRefreshCallback;
   private static readonly MAX_CONSECUTIVE_FAILURES = 3;
   private static readonly DEFAULT_TIMEOUT_MS = 10_000;
   private static readonly MAX_BACKOFF_MS = 30_000;
   private static readonly BASE_BACKOFF_MS = 1_000;
+
+  setToolsRefreshCallback(cb: ToolsRefreshCallback): void {
+    this.onToolsRefresh = cb;
+  }
 
   async connect(
     upstream: UpstreamConfig,
@@ -179,6 +190,10 @@ export class UpstreamManager {
       conn.status.degradedReason = undefined;
       conn.consecutiveFailures = 0;
       conn.reconnectAttempts = 0;
+
+      if (this.onToolsRefresh) {
+        await this.onToolsRefresh(conn.config.name, conn.config.namespace, tools);
+      }
     } catch (err) {
       conn.reconnectAttempts++;
       this.scheduleReconnect(conn);

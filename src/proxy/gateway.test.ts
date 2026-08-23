@@ -27,6 +27,7 @@ const testConfig: GatewayConfig = {
   telemetry: { enabled: false, serviceName: "test", sampleRate: 0 },
   auditLog: { enabled: true, path: "/tmp/test-audit.jsonl", rotateAfterMb: 10 },
   checkpoint: { enabled: false, intervalRecords: 100, intervalSeconds: 60, trigger: "whichever_first" as const },
+  toolIntegrity: { enabled: false, action: "record" as const },
 };
 
 describe("Gateway", () => {

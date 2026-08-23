@@ -8,6 +8,7 @@ import type {
 import { PolicyEngine, computeDecisionContextDigest } from "../policy/engine.js";
 import { AuditLog } from "../attestation/audit-log.js";
 import { createSigner } from "../attestation/signer.js";
+import { ToolIntegrityMonitor, type ToolDriftEvent } from "../attestation/tool-integrity.js";
 import { GatewayTracer } from "../telemetry/tracer.js";
 import { GatewayMetrics } from "../telemetry/metrics.js";
 import { UpstreamManager } from "./upstream-manager.js";
@@ -20,6 +21,8 @@ export class Gateway {
   private tracer: GatewayTracer;
   private metrics: GatewayMetrics;
   private upstreamManager: UpstreamManager;
+  private toolIntegrity: ToolIntegrityMonitor;
+  private driftedTools: Set<string> = new Set();
 
   constructor(private config: GatewayConfig) {
     this.policyEngine = new PolicyEngine(
@@ -37,6 +40,14 @@ export class Gateway {
     this.tracer = new GatewayTracer(config.telemetry);
     this.metrics = new GatewayMetrics(config.telemetry);
     this.upstreamManager = new UpstreamManager();
+    this.toolIntegrity = new ToolIntegrityMonitor();
+
+    this.upstreamManager.setToolsRefreshCallback(
+      async (upstreamName, namespace, tools) => {
+        this.registerUpstreamTools(upstreamName, namespace, tools);
+        await this.checkToolIntegrity(tools, namespace);
+      },
+    );
   }
 
   async init(): Promise<void> {
@@ -92,6 +103,52 @@ export class Gateway {
     };
   }
 
+  async checkToolIntegrity(
+    tools: Array<{
+      name: string;
+      description?: string;
+      inputSchema?: unknown;
+      annotations?: Record<string, unknown>;
+    }>,
+    namespace: string,
+  ): Promise<ToolDriftEvent[]> {
+    if (!this.config.toolIntegrity.enabled) return [];
+
+    const driftEvents: ToolDriftEvent[] = [];
+    for (const tool of tools) {
+      const qualifiedName = `${namespace}/${tool.name}`;
+      const event = this.toolIntegrity.checkAndUpdate(qualifiedName, namespace, {
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        annotations: tool.annotations,
+      });
+      if (event) {
+        driftEvents.push(event);
+        this.driftedTools.add(qualifiedName);
+        await this.auditLog.recordToolDrift({
+          toolName: event.toolName,
+          namespace: event.namespace,
+          previousDefinitionDigest: event.previousDefinitionDigest,
+          newDefinitionDigest: event.newDefinitionDigest,
+        });
+      }
+    }
+    return driftEvents;
+  }
+
+  isToolDrifted(qualifiedName: string): boolean {
+    return this.driftedTools.has(qualifiedName);
+  }
+
+  rebaselineTool(qualifiedName: string): boolean {
+    return this.driftedTools.delete(qualifiedName);
+  }
+
+  rebaselineAll(): void {
+    this.driftedTools.clear();
+  }
+
   async handleToolsCall(
     toolName: string,
     args: Record<string, unknown>,
@@ -111,6 +168,27 @@ export class Gateway {
         errorCode: -32602,
       });
       throw new ToolCallError(-32602, `Unknown tool: ${toolName}`, record);
+    }
+
+    if (
+      this.config.toolIntegrity.enabled &&
+      this.config.toolIntegrity.action === "record_and_block" &&
+      this.driftedTools.has(toolName)
+    ) {
+      const record = await this.auditLog.record("tools/call", {
+        toolName,
+        namespace: tool.namespace,
+        upstream: tool.upstream,
+        principal,
+        durationMs: Date.now() - startTime,
+        success: false,
+        errorCode: -32603,
+      });
+      throw new ToolCallError(
+        -32603,
+        `Tool definition drift detected for ${toolName} — call blocked pending operator rebaseline`,
+        record,
+      );
     }
 
     const decision = this.policyEngine.evaluate(principal, tool);
@@ -288,6 +366,15 @@ export class Gateway {
         annotations: tool.annotations,
       };
       this.toolCatalog.set(namespacedName, entry);
+
+      if (this.config.toolIntegrity.enabled) {
+        this.toolIntegrity.checkAndUpdate(namespacedName, namespace, {
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema,
+          annotations: tool.annotations,
+        });
+      }
     }
 
     if (!this.manualStatuses) this.manualStatuses = new Map();

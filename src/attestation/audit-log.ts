@@ -1,6 +1,6 @@
 import { appendFile, stat, rename, open, writeFile as fsWriteFile } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
-import type { AuditRecord, CheckpointRecord, ChainBreakRecord, PartyAttribution, ChainRecord } from "../types.js";
+import type { AuditRecord, CheckpointRecord, ChainBreakRecord, ToolDriftRecord, PartyAttribution, ChainRecord } from "../types.js";
 import { isCheckpoint, isChainBreak } from "../types.js";
 import type { Signer } from "./signer.js";
 
@@ -31,7 +31,7 @@ function buildParties(hasDecisionContext: boolean, hasAiInvocation: boolean): Pa
   return parties;
 }
 
-export function hashRecord(record: AuditRecord | CheckpointRecord | ChainBreakRecord): string {
+export function hashRecord(record: AuditRecord | CheckpointRecord | ChainBreakRecord | ToolDriftRecord): string {
   const json = JSON.stringify(record);
   return createHash("sha256").update(json).digest("hex");
 }
@@ -466,5 +466,62 @@ export class AuditLog {
         }
       });
     });
+  }
+
+  async recordToolDrift(opts: {
+    toolName: string;
+    namespace: string;
+    previousDefinitionDigest: string;
+    newDefinitionDigest: string;
+  }): Promise<ToolDriftRecord> {
+    return new Promise((resolve, reject) => {
+      this.writeQueue = this.writeQueue.then(async () => {
+        try {
+          const result = await this.writeToolDrift(opts);
+          resolve(result);
+        } catch (err) {
+          reject(err);
+        }
+      });
+    });
+  }
+
+  private async writeToolDrift(opts: {
+    toolName: string;
+    namespace: string;
+    previousDefinitionDigest: string;
+    newDefinitionDigest: string;
+  }): Promise<ToolDriftRecord> {
+    const record: ToolDriftRecord = {
+      id: `drift_${randomUUID()}`,
+      type: "tool_drift",
+      timestamp: new Date().toISOString(),
+      toolName: opts.toolName,
+      namespace: opts.namespace,
+      previousDefinitionDigest: opts.previousDefinitionDigest,
+      newDefinitionDigest: opts.newDefinitionDigest,
+      detectedAtRecord: this.totalRecordCount,
+      previousHash: this.lastHash,
+    };
+
+    record.attestation = await this.signer.sign(record);
+    const line = JSON.stringify(record) + "\n";
+
+    await appendFile(this.path, line);
+    this.currentSize += Buffer.byteLength(line);
+
+    this.lastHash = hashRecord(record);
+    this.totalRecordCount++;
+    this.recordsSinceCheckpoint++;
+
+    if (this.shouldEmitCheckpoint()) {
+      await this.writeCheckpoint();
+    }
+
+    if (this.currentSize >= this.rotateAfterBytes) {
+      await this.rotate();
+    }
+
+    return record;
   }
 }

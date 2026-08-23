@@ -1,10 +1,10 @@
 <?php
 // SDK-level serialization test for PHP MCP SDK.
-// Uses json_encode with JSON_UNESCAPED_SLASHES flag,
-// matching the configuration in php-sdk/src/Server/Stateless/StatelessResult.php
-// and src/Server/Transport/Http/StatelessResponder.php.
+// Uses json_encode with JSON_THROW_ON_ERROR only,
+// matching StdioTransport and StreamableHttpTransport.
+// NOTE: StatelessResponder adds JSON_UNESCAPED_SLASHES (transport-level inconsistency).
 
-$FLAGS = JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES;
+$FLAGS = JSON_THROW_ON_ERROR;
 
 function emit($test, $result) {
     echo json_encode(["test" => $test, "result" => $result], JSON_THROW_ON_ERROR) . "\n";

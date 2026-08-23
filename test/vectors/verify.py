@@ -18,16 +18,53 @@ vectors = json.loads(vectors_path.read_text())
 FIELD_ORDER = vectors["field_order"]
 
 
+def assert_well_formed(value: str) -> None:
+    for i, ch in enumerate(value):
+        if 0xD800 <= ord(ch) <= 0xDFFF:
+            raise ValueError(f"unpaired surrogate at index {i}")
+
+
+def canonicalize_value(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        assert_well_formed(value)
+        return value
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        if abs(value) > 2**53 - 1:
+            raise ValueError(f"unsafe number {value}")
+        return value
+    if isinstance(value, float):
+        raise ValueError(f"unsafe number {value}")
+    if isinstance(value, list):
+        return ["L", [canonicalize_value(v) for v in value]]
+    if isinstance(value, dict):
+        keys = sorted(value.keys(), key=lambda k: k.encode("utf-16-be"))
+        for k in keys:
+            assert_well_formed(k)
+        return ["M", [[k, canonicalize_value(value[k])] for k in keys]]
+    raise ValueError(f"unsupported type {type(value)}")
+
+
 def canonicalize(record: dict) -> str:
     """Reproduce the tuple-array canonical form in Python."""
     ordered = []
     for key in FIELD_ORDER:
         value = record.get(key)
         ordered.append([key, value])
+    insert_at = 11
     if record.get("decisionContextDigest") is not None:
         ordered.insert(10, ["decisionContextDigest", record["decisionContextDigest"]])
+        insert_at = 12
+    if record.get("extensionsDigest") is not None:
+        ordered.insert(insert_at, ["extensionsDigest", record["extensionsDigest"]])
+        insert_at += 1
+    if record.get("aiInvocation") is not None:
+        ordered.insert(insert_at, ["aiInvocation", canonicalize_value(record["aiInvocation"])])
+        insert_at += 1
     if record.get("parties") is not None:
-        insert_at = 12 if record.get("decisionContextDigest") is not None else 11
         ordered.insert(insert_at, ["parties", record["parties"]])
     return json.dumps(ordered, separators=(",", ":"), ensure_ascii=False)
 
@@ -264,6 +301,46 @@ if "party_attribution" in vectors:
         else:
             print("  FAIL: scope order should produce different hashes")
             failed += 1
+
+
+# --- aiInvocation signing vectors ---
+if vectors.get("ai_invocation_signing"):
+    print("\n=== aiInvocation Signing ===\n")
+    for v in vectors["ai_invocation_signing"]["vectors"]:
+        canonical = canonicalize(v["record"])
+        if canonical == v["canonical"]:
+            print(f"  PASS: {v['name']} canonical form"); passed += 1
+        else:
+            print(f"  FAIL: {v['name']} canonical form"); failed += 1
+        if sha256_hex(canonical) == v["sha256_canonical"]:
+            print(f"  PASS: {v['name']} digest"); passed += 1
+        else:
+            print(f"  FAIL: {v['name']} digest"); failed += 1
+    mn = vectors["ai_invocation_signing"]["mutation_negative"]
+    h_orig = sha256_hex(canonicalize(mn["original"]["record"]))
+    h_mut = sha256_hex(canonicalize(mn["mutated"]["record"]))
+    if h_orig == mn["original"]["sha256_canonical"] and h_mut == mn["mutated"]["sha256_canonical"]:
+        print("  PASS: mutation pair digests reproduce"); passed += 1
+    else:
+        print("  FAIL: mutation pair digests reproduce"); failed += 1
+    if h_orig != h_mut:
+        print("  PASS: mutated aiInvocation changes signing digest"); passed += 1
+    else:
+        print("  FAIL: mutated aiInvocation must change signing digest"); failed += 1
+
+# --- extensionsDigest base-suite vectors ---
+if vectors.get("extensions_digest_base"):
+    print("\n=== extensionsDigest (base suite) ===\n")
+    for v in vectors["extensions_digest_base"]["vectors"]:
+        canonical = canonicalize(v["record"])
+        if canonical == v["canonical"]:
+            print(f"  PASS: {v['name']} canonical form"); passed += 1
+        else:
+            print(f"  FAIL: {v['name']} canonical form"); failed += 1
+        if sha256_hex(canonical) == v["sha256_canonical"]:
+            print(f"  PASS: {v['name']} digest"); passed += 1
+        else:
+            print(f"  FAIL: {v['name']} digest"); failed += 1
 
 # --- Summary ---
 print(f"\n=== Results: {passed} passed, {failed} failed ===")

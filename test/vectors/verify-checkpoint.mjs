@@ -248,6 +248,10 @@ function canonicalizeRecord(record) {
     ordered.splice(insertAt, 0, ["extensionsDigest", record.extensionsDigest]);
     insertAt++;
   }
+  if (record.aiInvocation != null) {
+    ordered.splice(insertAt, 0, ["aiInvocation", canonicalizeValue(record.aiInvocation)]);
+    insertAt++;
+  }
   if (record.parties != null) {
     ordered.splice(insertAt, 0, ["parties", record.parties]);
   }

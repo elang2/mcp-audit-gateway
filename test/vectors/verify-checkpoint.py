@@ -262,6 +262,9 @@ def canonicalize_record(record: dict) -> str:
     if record.get("extensionsDigest") is not None:
         ordered.insert(insert_at, ["extensionsDigest", record["extensionsDigest"]])
         insert_at += 1
+    if record.get("aiInvocation") is not None:
+        ordered.insert(insert_at, ["aiInvocation", canonicalize_value(record["aiInvocation"])])
+        insert_at += 1
     if record.get("parties") is not None:
         ordered.insert(insert_at, ["parties", record["parties"]])
     return json.dumps(ordered, separators=(",", ":"), ensure_ascii=False)

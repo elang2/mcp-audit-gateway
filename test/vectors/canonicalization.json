@@ -578,5 +578,187 @@
         }
       ]
     }
+  },
+  "ai_invocation_signing": {
+    "description": "aiInvocation is signature-covered: inserted after extensionsDigest, before parties, as its canonicalizeValue (M/L-tagged) form. Keys sort by UTF-16 code units.",
+    "vectors": [
+      {
+        "name": "ai_invocation_full",
+        "record": {
+          "id": "aivec-0001",
+          "timestamp": "2026-08-23T00:00:00.000Z",
+          "method": "tools/call",
+          "toolName": "github/create_pr",
+          "namespace": "github",
+          "upstream": "gh",
+          "principal": "user-1",
+          "durationMs": 42,
+          "success": true,
+          "errorCode": null,
+          "previousHash": "genesis",
+          "aiInvocation": {
+            "turnId": "t1",
+            "invocationReason": "user asked",
+            "model": "claude-4"
+          }
+        },
+        "canonical": "[[\"id\",\"aivec-0001\"],[\"timestamp\",\"2026-08-23T00:00:00.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"github/create_pr\"],[\"namespace\",\"github\"],[\"upstream\",\"gh\"],[\"principal\",\"user-1\"],[\"durationMs\",42],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"],[\"aiInvocation\",[\"M\",[[\"invocationReason\",\"user asked\"],[\"model\",\"claude-4\"],[\"turnId\",\"t1\"]]]]]",
+        "sha256_canonical": "fddd4a4043f5403a731c116051fb182018176618edb17d3e5d020083e8ff33cf"
+      },
+      {
+        "name": "ai_invocation_partial_turnid_only",
+        "record": {
+          "id": "aivec-0001",
+          "timestamp": "2026-08-23T00:00:00.000Z",
+          "method": "tools/call",
+          "toolName": "github/create_pr",
+          "namespace": "github",
+          "upstream": "gh",
+          "principal": "user-1",
+          "durationMs": 42,
+          "success": true,
+          "errorCode": null,
+          "previousHash": "genesis",
+          "aiInvocation": {
+            "turnId": "t1"
+          }
+        },
+        "canonical": "[[\"id\",\"aivec-0001\"],[\"timestamp\",\"2026-08-23T00:00:00.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"github/create_pr\"],[\"namespace\",\"github\"],[\"upstream\",\"gh\"],[\"principal\",\"user-1\"],[\"durationMs\",42],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"],[\"aiInvocation\",[\"M\",[[\"turnId\",\"t1\"]]]]]",
+        "sha256_canonical": "7e8627013a6a2430b0fb308fa493e3f6a7b552385734621bb1b8cb4587d4d1f3"
+      },
+      {
+        "name": "ai_invocation_with_all_optionals",
+        "record": {
+          "id": "aivec-0001",
+          "timestamp": "2026-08-23T00:00:00.000Z",
+          "method": "tools/call",
+          "toolName": "github/create_pr",
+          "namespace": "github",
+          "upstream": "gh",
+          "principal": "user-1",
+          "durationMs": 42,
+          "success": true,
+          "errorCode": null,
+          "previousHash": "genesis",
+          "decisionContextDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "extensionsDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "aiInvocation": {
+            "turnId": "t1",
+            "model": "claude-4"
+          },
+          "parties": [
+            {
+              "party": "gateway",
+              "role": "witness",
+              "scope": [
+                "id",
+                "timestamp",
+                "method",
+                "toolName",
+                "namespace",
+                "upstream",
+                "principal",
+                "durationMs",
+                "success",
+                "errorCode",
+                "previousHash"
+              ]
+            },
+            {
+              "party": "client",
+              "role": "asserter",
+              "scope": [
+                "aiInvocation"
+              ]
+            }
+          ]
+        },
+        "canonical": "[[\"id\",\"aivec-0001\"],[\"timestamp\",\"2026-08-23T00:00:00.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"github/create_pr\"],[\"namespace\",\"github\"],[\"upstream\",\"gh\"],[\"principal\",\"user-1\"],[\"durationMs\",42],[\"success\",true],[\"errorCode\",null],[\"decisionContextDigest\",\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"],[\"previousHash\",\"genesis\"],[\"extensionsDigest\",\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\"],[\"aiInvocation\",[\"M\",[[\"model\",\"claude-4\"],[\"turnId\",\"t1\"]]]],[\"parties\",[{\"party\":\"gateway\",\"role\":\"witness\",\"scope\":[\"id\",\"timestamp\",\"method\",\"toolName\",\"namespace\",\"upstream\",\"principal\",\"durationMs\",\"success\",\"errorCode\",\"previousHash\"]},{\"party\":\"client\",\"role\":\"asserter\",\"scope\":[\"aiInvocation\"]}]]]",
+        "sha256_canonical": "cc6cc5a9146f4c5cf5952e354288705cb67a642f5790fc2fec7acd6bb3c5e682"
+      }
+    ],
+    "mutation_negative": {
+      "description": "Mutating any aiInvocation field changes the signing digest; a signature over the original record must fail against the mutated record.",
+      "original": {
+        "name": "original",
+        "record": {
+          "id": "aivec-0001",
+          "timestamp": "2026-08-23T00:00:00.000Z",
+          "method": "tools/call",
+          "toolName": "github/create_pr",
+          "namespace": "github",
+          "upstream": "gh",
+          "principal": "user-1",
+          "durationMs": 42,
+          "success": true,
+          "errorCode": null,
+          "previousHash": "genesis",
+          "aiInvocation": {
+            "turnId": "t1",
+            "invocationReason": "user asked",
+            "model": "claude-4"
+          }
+        },
+        "canonical": "[[\"id\",\"aivec-0001\"],[\"timestamp\",\"2026-08-23T00:00:00.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"github/create_pr\"],[\"namespace\",\"github\"],[\"upstream\",\"gh\"],[\"principal\",\"user-1\"],[\"durationMs\",42],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"],[\"aiInvocation\",[\"M\",[[\"invocationReason\",\"user asked\"],[\"model\",\"claude-4\"],[\"turnId\",\"t1\"]]]]]",
+        "sha256_canonical": "fddd4a4043f5403a731c116051fb182018176618edb17d3e5d020083e8ff33cf"
+      },
+      "mutated": {
+        "name": "mutated_turnId",
+        "record": {
+          "id": "aivec-0001",
+          "timestamp": "2026-08-23T00:00:00.000Z",
+          "method": "tools/call",
+          "toolName": "github/create_pr",
+          "namespace": "github",
+          "upstream": "gh",
+          "principal": "user-1",
+          "durationMs": 42,
+          "success": true,
+          "errorCode": null,
+          "previousHash": "genesis",
+          "aiInvocation": {
+            "turnId": "t2",
+            "invocationReason": "user asked",
+            "model": "claude-4"
+          }
+        },
+        "canonical": "[[\"id\",\"aivec-0001\"],[\"timestamp\",\"2026-08-23T00:00:00.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"github/create_pr\"],[\"namespace\",\"github\"],[\"upstream\",\"gh\"],[\"principal\",\"user-1\"],[\"durationMs\",42],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"],[\"aiInvocation\",[\"M\",[[\"invocationReason\",\"user asked\"],[\"model\",\"claude-4\"],[\"turnId\",\"t2\"]]]]]",
+        "sha256_canonical": "960ffc250afd098da527c99dd932fd6d4cc3c1c51283c69861facda20db7f438"
+      },
+      "digests_differ": true
+    }
+  },
+  "extensions_digest_base": {
+    "description": "Base-suite exercise of extensionsDigest insertion order (between decisionContextDigest slot and parties).",
+    "vectors": [
+      {
+        "name": "extensions_digest_with_parties",
+        "record": {
+          "id": "aivec-0001",
+          "timestamp": "2026-08-23T00:00:00.000Z",
+          "method": "tools/call",
+          "toolName": "github/create_pr",
+          "namespace": "github",
+          "upstream": "gh",
+          "principal": "user-1",
+          "durationMs": 42,
+          "success": true,
+          "errorCode": null,
+          "previousHash": "genesis",
+          "extensionsDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "parties": [
+            {
+              "party": "gateway",
+              "role": "witness",
+              "scope": [
+                "id"
+              ]
+            }
+          ]
+        },
+        "canonical": "[[\"id\",\"aivec-0001\"],[\"timestamp\",\"2026-08-23T00:00:00.000Z\"],[\"method\",\"tools/call\"],[\"toolName\",\"github/create_pr\"],[\"namespace\",\"github\"],[\"upstream\",\"gh\"],[\"principal\",\"user-1\"],[\"durationMs\",42],[\"success\",true],[\"errorCode\",null],[\"previousHash\",\"genesis\"],[\"extensionsDigest\",\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\"],[\"parties\",[{\"party\":\"gateway\",\"role\":\"witness\",\"scope\":[\"id\"]}]]]",
+        "sha256_canonical": "0fb68b55f31aabe40cea3ab15962aa4ea348c148b9c85ed6cad5a522e7ac1b34"
+      }
+    ]
   }
 }

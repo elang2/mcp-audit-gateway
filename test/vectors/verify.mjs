@@ -12,13 +12,53 @@ function sha256Hex(input) {
   return createHash("sha256").update(input).digest("hex");
 }
 
+function canonicalizeValue(value) {
+  if (value === null || value === undefined) return null;
+  switch (typeof value) {
+    case "string":
+      for (let i = 0; i < value.length; i++) {
+        const code = value.charCodeAt(i);
+        if (code >= 0xD800 && code <= 0xDBFF) {
+          const next = i + 1 < value.length ? value.charCodeAt(i + 1) : 0;
+          if (next < 0xDC00 || next > 0xDFFF)
+            throw new Error(`unpaired surrogate at index ${i}`);
+          i++;
+        } else if (code >= 0xDC00 && code <= 0xDFFF) {
+          throw new Error(`unpaired surrogate at index ${i}`);
+        }
+      }
+      return value;
+    case "boolean":
+      return value;
+    case "number":
+      if (!Number.isSafeInteger(value)) throw new Error(`unsafe number ${value}`);
+      return value;
+    case "object": {
+      if (Array.isArray(value)) return ["L", value.map(canonicalizeValue)];
+      const keys = Object.keys(value).sort().filter((k) => value[k] !== undefined);
+      return ["M", keys.map((k) => [k, canonicalizeValue(value[k])])];
+    }
+    default:
+      throw new Error(`unsupported type ${typeof value}`);
+  }
+}
+
 function canonicalizeFromRecord(record, fieldOrder) {
   const ordered = fieldOrder.map((key) => [key, record[key] ?? null]);
+  let insertAt = 11;
   if (record.decisionContextDigest != null) {
     ordered.splice(10, 0, ["decisionContextDigest", record.decisionContextDigest]);
+    insertAt = 12;
+  }
+  if (record.extensionsDigest != null) {
+    ordered.splice(insertAt, 0, ["extensionsDigest", record.extensionsDigest]);
+    insertAt++;
+  }
+  if (record.aiInvocation != null) {
+    ordered.splice(insertAt, 0, ["aiInvocation", canonicalizeValue(record.aiInvocation)]);
+    insertAt++;
   }
   if (record.parties != null) {
-    const insertAt = record.decisionContextDigest != null ? 12 : 11;
     ordered.splice(insertAt, 0, ["parties", record.parties]);
   }
   return JSON.stringify(ordered);
@@ -266,6 +306,39 @@ if (vectors.party_attribution) {
       console.log("  FAIL: scope order should produce different hashes");
       failed++;
     }
+  }
+}
+
+
+// --- aiInvocation signing vectors ---
+if (vectors.ai_invocation_signing) {
+  console.log("\n=== aiInvocation Signing ===\n");
+  for (const v of vectors.ai_invocation_signing.vectors) {
+    const canonical = canonicalizeFromRecord(v.record, vectors.field_order);
+    if (canonical === v.canonical) { console.log(`  PASS: ${v.name} canonical form`); passed++; }
+    else { console.log(`  FAIL: ${v.name} canonical form`); failed++; }
+    if (sha256Hex(canonical) === v.sha256_canonical) { console.log(`  PASS: ${v.name} digest`); passed++; }
+    else { console.log(`  FAIL: ${v.name} digest`); failed++; }
+  }
+  const mn = vectors.ai_invocation_signing.mutation_negative;
+  const hOrig = sha256Hex(canonicalizeFromRecord(mn.original.record, vectors.field_order));
+  const hMut = sha256Hex(canonicalizeFromRecord(mn.mutated.record, vectors.field_order));
+  if (hOrig === mn.original.sha256_canonical && hMut === mn.mutated.sha256_canonical) {
+    console.log("  PASS: mutation pair digests reproduce"); passed++;
+  } else { console.log("  FAIL: mutation pair digests reproduce"); failed++; }
+  if (hOrig !== hMut) { console.log("  PASS: mutated aiInvocation changes signing digest"); passed++; }
+  else { console.log("  FAIL: mutated aiInvocation must change signing digest"); failed++; }
+}
+
+// --- extensionsDigest base-suite vectors ---
+if (vectors.extensions_digest_base) {
+  console.log("\n=== extensionsDigest (base suite) ===\n");
+  for (const v of vectors.extensions_digest_base.vectors) {
+    const canonical = canonicalizeFromRecord(v.record, vectors.field_order);
+    if (canonical === v.canonical) { console.log(`  PASS: ${v.name} canonical form`); passed++; }
+    else { console.log(`  FAIL: ${v.name} canonical form`); failed++; }
+    if (sha256Hex(canonical) === v.sha256_canonical) { console.log(`  PASS: ${v.name} digest`); passed++; }
+    else { console.log(`  FAIL: ${v.name} digest`); failed++; }
   }
 }
 

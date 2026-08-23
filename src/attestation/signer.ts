@@ -126,7 +126,8 @@ export function canonicalizeRecord(record: AuditRecord): string {
   // Conditional fields inserted in deterministic order:
   // 1. decisionContextDigest (position 10, before previousHash moves to 11)
   // 2. extensionsDigest (after decisionContextDigest or at position 11)
-  // 3. parties (last)
+  // 3. aiInvocation (after extensionsDigest; M/L-tagged via canonicalizeValue)
+  // 4. parties (last)
   let insertAt = 11;
   if (record.decisionContextDigest != null) {
     ordered.splice(10, 0, ["decisionContextDigest", record.decisionContextDigest]);
@@ -134,6 +135,10 @@ export function canonicalizeRecord(record: AuditRecord): string {
   }
   if (record.extensionsDigest != null) {
     ordered.splice(insertAt, 0, ["extensionsDigest", record.extensionsDigest]);
+    insertAt++;
+  }
+  if (record.aiInvocation != null) {
+    ordered.splice(insertAt, 0, ["aiInvocation", canonicalizeValue(record.aiInvocation)]);
     insertAt++;
   }
   if (record.parties != null) {

@@ -1,0 +1,36 @@
+{
+  "name": "mcp-audit-gateway",
+  "version": "0.5.0",
+  "listen": {
+    "transport": "streamable-http",
+    "port": 3000,
+    "host": "0.0.0.0"
+  },
+  "upstreams": [
+    {
+      "name": "echo",
+      "namespace": "echo",
+      "transport": {
+        "type": "stdio",
+        "command": "node",
+        "args": ["echo-server.mjs"]
+      }
+    }
+  ],
+  "policy": {
+    "defaultEffect": "allow",
+    "rules": []
+  },
+  "attestation": {
+    "enabled": true,
+    "algorithm": "hmac-sha256",
+    "secret": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "telemetry": {
+    "enabled": false
+  },
+  "auditLog": {
+    "enabled": true,
+    "path": "/tmp/audit.jsonl"
+  }
+}

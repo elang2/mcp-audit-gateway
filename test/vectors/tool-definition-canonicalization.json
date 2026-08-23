@@ -1,0 +1,311 @@
+{
+  "schema": "tool-definition-canonicalization/v1",
+  "description": "Cross-language conformance vectors for MCP tool-definition digest computation. Digest = SHA-256(RFC 8785 JCS(toolDefinition)). All hex digests are lowercase.",
+  "algorithm": "sha256",
+  "canonicalization": "rfc8785-jcs",
+  "positive": [
+    {
+      "id": "P1",
+      "description": "Minimal tool (name + inputSchema only)",
+      "tool": {
+        "name": "read_file",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "path": { "type": "string" } },
+          "required": ["path"]
+        }
+      },
+      "expectedDigest": "c5926636aac59e0afbeb0027c6c8d59d59413ee39449e8d30e8ec8415d8ad474"
+    },
+    {
+      "id": "P2",
+      "description": "Tool with all fields populated",
+      "tool": {
+        "name": "create_issue",
+        "description": "Create a GitHub issue",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "body": { "type": "string" },
+            "labels": { "type": "array", "items": { "type": "string" } }
+          },
+          "required": ["title"]
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": true
+        }
+      },
+      "expectedDigest": "884a07a9e38571b1052dfe20aae299feaed75fb52fa83462b0d743ab29046016"
+    },
+    {
+      "id": "P3",
+      "description": "Nested inputSchema (properties containing objects)",
+      "tool": {
+        "name": "query_db",
+        "description": "Run a database query",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": { "type": "string" },
+            "options": {
+              "type": "object",
+              "properties": {
+                "timeout": { "type": "integer" },
+                "retries": { "type": "integer" }
+              }
+            }
+          },
+          "required": ["query"]
+        }
+      },
+      "expectedDigest": "1c600b8198a8251c740095718171553387f68d0e5867178720c78c74e899f4e1"
+    },
+    {
+      "id": "P4",
+      "description": "Float default (0.1) in inputSchema — tests JCS float handling",
+      "tool": {
+        "name": "set_threshold",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "value": { "type": "number", "default": 0.1 } }
+        }
+      },
+      "expectedDigest": "0c82ba8e79c6547b15a892b044f19f10aef16ce4267947223eb175bfa358b92f"
+    },
+    {
+      "id": "P5",
+      "description": "Integer default (42) in inputSchema",
+      "tool": {
+        "name": "set_count",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "count": { "type": "integer", "default": 42 } }
+        }
+      },
+      "expectedDigest": "31023c1a5a9794c65dc46a767cf6f90e35775058c724aa37021c19895e77e7f6"
+    },
+    {
+      "id": "P6",
+      "description": "All annotation boolean hints populated",
+      "tool": {
+        "name": "list_files",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false,
+          "title": "List Files"
+        }
+      },
+      "expectedDigest": "b20119af15974fbe32ee7401433b5f2c6e05a61c5155087061377be884599744"
+    },
+    {
+      "id": "P7",
+      "description": "Astral-plane character in description (U+1D573 Mathematical Fraktur H)",
+      "tool": {
+        "name": "render",
+        "description": "Render 𝕳 symbol"
+      },
+      "expectedDigest": "6a3643045d2c8fa135ca08b576a04451caa88a97d30146bc6c25706e30723cf6"
+    },
+    {
+      "id": "P8",
+      "description": "BMP Unicode in name (cafe with e-acute U+00E9)",
+      "tool": {
+        "name": "café",
+        "description": "Order a coffee"
+      },
+      "expectedDigest": "1a601952913504f7ea2a256835ee906f16946bfd1edcbe833dcdc8c8c2557bbb"
+    },
+    {
+      "id": "P9",
+      "description": "Negative zero (-0) normalizes to 0 under JCS (same digest as positive 0)",
+      "tool": {
+        "name": "tool",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "v": { "type": "number", "default": 0 } }
+        }
+      },
+      "expectedDigest": "cacf6fe5e819fd1906ac43a4263a87577a4066660bb0932e06dbdc3870e5e633",
+      "note": "Implementations MUST produce this same digest when the source value is -0"
+    }
+  ],
+  "negative": [
+    {
+      "id": "N1",
+      "description": "Key order differs but content is identical — MUST produce same digest (not different)",
+      "type": "same_digest",
+      "toolA": {
+        "name": "tool",
+        "description": "desc",
+        "inputSchema": { "type": "object", "properties": { "a": { "type": "string" }, "b": { "type": "number" } } }
+      },
+      "toolB": {
+        "name": "tool",
+        "description": "desc",
+        "inputSchema": { "properties": { "b": { "type": "number" }, "a": { "type": "string" } }, "type": "object" }
+      },
+      "expectedDigest": "ffb8d931442876b461f149f801e3eba8d5ba1f19b4071ef5ddec6ad4f73e2980"
+    },
+    {
+      "id": "N2",
+      "description": "description: null vs description absent — MUST produce different digests",
+      "type": "different_digest",
+      "toolA": { "name": "tool", "description": null },
+      "toolB": { "name": "tool" },
+      "digestA": "ae96b293885f8cc9f4b64205af54055676724b657370caeaafade1169c4ece2e",
+      "digestB": "44c44db8e9bdace66392dd357d3ecc69354817edb7b510cf31133f76c4c13ecc"
+    },
+    {
+      "id": "N3",
+      "description": "Trailing whitespace in description — MUST produce different digest",
+      "type": "different_digest",
+      "toolA": { "name": "tool", "description": "hello" },
+      "toolB": { "name": "tool", "description": "hello " }
+    },
+    {
+      "id": "N4",
+      "description": "Lone surrogate in name (U+D800) — MUST reject",
+      "type": "must_reject",
+      "tool": { "name": "bad\ud800name" },
+      "reason": "Lone surrogates are invalid in well-formed Unicode strings"
+    },
+    {
+      "id": "N5",
+      "description": "Integer 1 vs float 1.0 — same digest in JCS (both serialize as 1)",
+      "type": "same_digest",
+      "toolA": { "name": "tool", "inputSchema": { "type": "object", "properties": { "v": { "type": "number", "default": 1 } } } },
+      "toolB": { "name": "tool", "inputSchema": { "type": "object", "properties": { "v": { "type": "number", "default": 1.0 } } } },
+      "note": "In languages where 1 and 1.0 are the same IEEE double (JS, Python float), these MUST match. Languages with distinct int/float types (Go, Rust) must normalize both to JCS number representation."
+    },
+    {
+      "id": "N6",
+      "description": "NaN in inputSchema — MUST reject",
+      "type": "must_reject",
+      "note": "NaN is not valid JSON. Implementations must reject tool definitions containing NaN before canonicalization."
+    },
+    {
+      "id": "N7",
+      "description": "Empty properties {} vs properties absent — MUST produce different digests",
+      "type": "different_digest",
+      "toolA": { "name": "tool", "inputSchema": { "type": "object", "properties": {} } },
+      "toolB": { "name": "tool", "inputSchema": { "type": "object" } },
+      "digestA": "ad5d55a783396030cb9ae04af5235caabb132ee6843cb983f54b01803c66350e",
+      "digestB": "f2af9ec170e6be13cdf47ad22ca2312c23ada8ac5ac776ba9ff104055b2a4a20"
+    },
+    {
+      "id": "N8",
+      "description": "Integer > 2^53 — MUST reject (I-JSON RFC 7493 constraint)",
+      "type": "must_reject",
+      "tool": { "name": "tool", "inputSchema": { "type": "object", "properties": { "big": { "type": "integer", "default": 9007199254740993 } } } },
+      "reason": "Integers exceeding 2^53 lose precision in IEEE 754 doubles, causing silent digest collisions across implementations"
+    },
+    {
+      "id": "N9",
+      "description": "Lone surrogate in description (U+DFFF) — MUST reject",
+      "type": "must_reject",
+      "tool": { "name": "tool", "description": "bad\udfffvalue" },
+      "reason": "Unpaired low surrogate is invalid UTF-16"
+    },
+    {
+      "id": "N11",
+      "description": "Annotations in different key order — MUST produce same digest",
+      "type": "same_digest",
+      "toolA": { "name": "tool", "annotations": { "readOnlyHint": true, "destructiveHint": false } },
+      "toolB": { "name": "tool", "annotations": { "destructiveHint": false, "readOnlyHint": true } }
+    },
+    {
+      "id": "N12",
+      "description": "$ref unexpanded vs resolved inline — MUST produce different digests (hash-as-received)",
+      "type": "different_digest",
+      "toolA": {
+        "name": "validate",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "data": { "$ref": "#/$defs/Payload" } },
+          "$defs": { "Payload": { "type": "object", "properties": { "id": { "type": "string" } } } }
+        }
+      },
+      "toolB": {
+        "name": "validate",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "data": { "type": "object", "properties": { "id": { "type": "string" } } } }
+        }
+      },
+      "digestA": "f8ee721437da621c1b75b454b16fab6f15dd1a23afe52a16ffdb5a230d2201c0",
+      "digestB": "e520e2c253d35f2c61bb1dbd8e4d00ff2ceb2bbf4e91e0f6c3914ce174f11ff0"
+    }
+  ],
+  "drift": [
+    {
+      "id": "D1",
+      "description": "Description text changed — drift MUST be detected",
+      "before": { "name": "deploy", "description": "Deploy to staging" },
+      "after": { "name": "deploy", "description": "Deploy to production" },
+      "beforeDigest": "c57bc9ee0090a08609348c55fefa75b1c3bd7027b15400685143578a3dd5d06d",
+      "afterDigest": "40d022d88efeacc497d155d6a637ce9cc8485daa674b6032582ae82012b9fdf1",
+      "driftExpected": true
+    },
+    {
+      "id": "D2",
+      "description": "inputSchema property added — drift MUST be detected",
+      "before": {
+        "name": "search",
+        "inputSchema": { "type": "object", "properties": { "query": { "type": "string" } }, "required": ["query"] }
+      },
+      "after": {
+        "name": "search",
+        "inputSchema": { "type": "object", "properties": { "query": { "type": "string" }, "limit": { "type": "integer", "default": 10 } }, "required": ["query"] }
+      },
+      "beforeDigest": "92ba2939e93a874bd9e87838e4a6c285e6ace2593ff306356e4ffe9492be0771",
+      "afterDigest": "8258e2811ad1d45fa637d5c89a7a62651a3910f20160ff60cc05c18ca3a03c72",
+      "driftExpected": true
+    },
+    {
+      "id": "D3",
+      "description": "Annotation value flipped (destructiveHint false->true) — drift MUST be detected",
+      "before": { "name": "delete_file", "annotations": { "readOnlyHint": false, "destructiveHint": false } },
+      "after": { "name": "delete_file", "annotations": { "readOnlyHint": false, "destructiveHint": true } },
+      "beforeDigest": "37635502bd9104fbc4eabdf7a20925d5297d84b45144018e9f0804c9b37e69d2",
+      "afterDigest": "0f28aafde9b0ba05d3a91b972d6365ae41882284e05eb83f25ddc2d5b5b41f23",
+      "driftExpected": true
+    },
+    {
+      "id": "D4",
+      "description": "Key order changed but content identical — drift MUST NOT be detected",
+      "before": { "name": "tool", "description": "desc", "inputSchema": { "type": "object", "properties": { "x": { "type": "string" } } } },
+      "after": { "name": "tool", "inputSchema": { "properties": { "x": { "type": "string" } }, "type": "object" }, "description": "desc" },
+      "beforeDigest": "7fa9e29e420e753d05f954d99ea54bbae4709dd8c7610a9e5a302355f75ee5b0",
+      "afterDigest": "7fa9e29e420e753d05f954d99ea54bbae4709dd8c7610a9e5a302355f75ee5b0",
+      "driftExpected": false
+    },
+    {
+      "id": "D5",
+      "description": "$ref refactored to inline — drift IS detected (different wire bytes, hash-as-received)",
+      "before": {
+        "name": "validate",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "data": { "$ref": "#/$defs/Payload" } },
+          "$defs": { "Payload": { "type": "object", "properties": { "id": { "type": "string" } } } }
+        }
+      },
+      "after": {
+        "name": "validate",
+        "inputSchema": {
+          "type": "object",
+          "properties": { "data": { "type": "object", "properties": { "id": { "type": "string" } } } }
+        }
+      },
+      "beforeDigest": "f8ee721437da621c1b75b454b16fab6f15dd1a23afe52a16ffdb5a230d2201c0",
+      "afterDigest": "e520e2c253d35f2c61bb1dbd8e4d00ff2ceb2bbf4e91e0f6c3914ce174f11ff0",
+      "driftExpected": true
+    }
+  ]
+}

@@ -145,10 +145,38 @@ This installs the `mcp-audit` CLI globally. Or use without installing:
 npx @mcp-gateway/audit wrap -- <your mcp server command>
 ```
 
+## Attestation layer
+
+The signing and verification subsystem goes beyond per-record HMAC. It provides tamper-evidence across log rotation, crash recovery, and multi-file chains.
+
+Checkpoint records let a consumer detect tail truncation by stashing a single hash externally. The chain carries forward across file rotations (no silent resets). Forced restarts emit signed `chain_break` records instead of quietly starting fresh.
+
+The canonical form is type-tagged and injective, avoids JCS's float-formatting problem by rejecting unsafe numbers entirely, and has proven cross-language parity via 46 conformance vectors (JS + Python). See [SECURITY-DESIGN.md](docs/SECURITY-DESIGN.md) for the full specification and threat model.
+
+## Conformance
+
+This implementation satisfies the following properties (verified by cross-language conformance vectors and unit tests):
+
+- Injective canonical form (no cross-type digest collisions)
+- Cross-language sort equivalence (UTF-16 code-unit order)
+- Unpaired surrogate rejection
+- Hash chain continuity across log rotation
+- Planted state detection on startup
+- No false-positive after legitimate chain break
+- Fail-closed on corrupt or oversized input
+- Segmented monotonicity at chain_break boundaries
+- Consumer-anchored completeness via checkpoint records
+- Memory-bounded init (1MB cap)
+
+APS action-ref-v1 conformance: 51/51 vectors passing (JCS recomputation + fail-closed digest comparison).
+
 ## Testing
 
 ```bash
-npm test   # 96 tests across 12 test files
+npm test                                    # 149 unit tests
+node test/vectors/verify-checkpoint.mjs     # 46 JS conformance vectors
+python3 test/vectors/verify-checkpoint.py   # 46 Python conformance vectors
+node test/vectors/aps-action-ref-v1.mjs     # 51 APS vectors
 ```
 
 ## License

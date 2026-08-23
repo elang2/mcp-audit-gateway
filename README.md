@@ -137,12 +137,12 @@ See [gateway configuration](gateway.config.example.json) for the full schema.
 ## Install
 
 ```bash
-npm install -g @mcp-gateway/audit
+npm install -g @mcp-audit-gateway/core
 ```
 
 This installs the `mcp-audit` CLI globally. Or use without installing:
 ```bash
-npx @mcp-gateway/audit wrap -- <your mcp server command>
+npx @mcp-audit-gateway/core wrap -- <your mcp server command>
 ```
 
 ## Attestation layer

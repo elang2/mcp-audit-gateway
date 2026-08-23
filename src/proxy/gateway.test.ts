@@ -95,6 +95,23 @@ describe("Gateway", () => {
         gateway.handleToolsCall("test/dangerous_tool", {}, "agent:blocked"),
       ).rejects.toThrow();
     });
+
+    it("includes aiInvocation context and client-asserter party", async () => {
+      const aiInvocation = { turnId: "turn-abc", invocationReason: "user asked", model: "claude-4" };
+      try {
+        await gateway.handleToolsCall("test/safe_tool", {}, "user:test", undefined, aiInvocation);
+      } catch {
+        // upstream not connected, but the record should still be created on error path
+      }
+      // The denied path gives us a record we can inspect
+      try {
+        await gateway.handleToolsCall("test/dangerous_tool", {}, "agent:blocked", undefined, aiInvocation);
+      } catch (err: unknown) {
+        const record = (err as { auditRecord: { aiInvocation?: unknown; parties?: Array<{ party: string; role: string; scope: string[] }> } }).auditRecord;
+        expect(record.aiInvocation).toEqual(aiInvocation);
+        expect(record.parties).toContainEqual({ party: "client", role: "asserter", scope: ["aiInvocation"] });
+      }
+    });
   });
 
   describe("status", () => {

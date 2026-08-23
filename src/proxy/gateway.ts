@@ -97,6 +97,7 @@ export class Gateway {
     args: Record<string, unknown>,
     principal?: string,
     traceContext?: { traceparent?: string; tracestate?: string },
+    aiInvocation?: { turnId?: string; invocationReason?: string; model?: string },
   ): Promise<{ result: unknown; auditRecord: AuditRecord }> {
     const startTime = Date.now();
     const tool = this.toolCatalog.get(toolName);
@@ -130,6 +131,7 @@ export class Gateway {
         success: false,
         errorCode: -32603,
         decisionContextDigest: contextDigest,
+        aiInvocation,
       });
       throw new ToolCallError(
         -32603,
@@ -177,6 +179,7 @@ export class Gateway {
         durationMs,
         success: true,
         decisionContextDigest: contextDigest,
+        aiInvocation,
       });
 
       return { result, auditRecord: record };
@@ -207,6 +210,7 @@ export class Gateway {
         success: false,
         errorCode: -32603,
         decisionContextDigest: contextDigest,
+        aiInvocation,
       });
       throw new ToolCallError(-32603, "Upstream server error", record);
     }

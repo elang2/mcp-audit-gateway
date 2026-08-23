@@ -101,6 +101,12 @@ export interface PartyAttribution {
   scope: string[];
 }
 
+export interface AiInvocationContext {
+  turnId?: string;
+  invocationReason?: string;
+  model?: string;
+}
+
 export interface AuditRecord {
   id: string;
   timestamp: string;
@@ -114,6 +120,7 @@ export interface AuditRecord {
   errorCode?: number;
   decisionContextDigest?: string;
   extensionsDigest?: string;
+  aiInvocation?: AiInvocationContext;
   parties?: PartyAttribution[];
   previousHash?: string;
   attestation?: string;

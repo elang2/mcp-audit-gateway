@@ -10,7 +10,7 @@ const GATEWAY_WITNESSED_FIELDS = [
   "previousHash",
 ];
 
-function buildParties(hasDecisionContext: boolean): PartyAttribution[] {
+function buildParties(hasDecisionContext: boolean, hasAiInvocation: boolean): PartyAttribution[] {
   const parties: PartyAttribution[] = [
     { party: "gateway", role: "witness", scope: GATEWAY_WITNESSED_FIELDS },
   ];
@@ -19,6 +19,13 @@ function buildParties(hasDecisionContext: boolean): PartyAttribution[] {
       party: "policy-engine",
       role: "asserter",
       scope: ["decisionContextDigest"],
+    });
+  }
+  if (hasAiInvocation) {
+    parties.push({
+      party: "client",
+      role: "asserter",
+      scope: ["aiInvocation"],
     });
   }
   return parties;
@@ -67,6 +74,7 @@ export class AuditLog {
       success: boolean;
       errorCode?: number;
       decisionContextDigest?: string;
+      aiInvocation?: { turnId?: string; invocationReason?: string; model?: string };
     },
   ): Promise<AuditRecord> {
     return new Promise((resolve, reject) => {
@@ -92,14 +100,17 @@ export class AuditLog {
       success: boolean;
       errorCode?: number;
       decisionContextDigest?: string;
+      aiInvocation?: { turnId?: string; invocationReason?: string; model?: string };
     },
   ): Promise<AuditRecord> {
+    const { aiInvocation, ...rest } = opts;
     const record: AuditRecord = {
       id: randomUUID(),
       timestamp: new Date().toISOString(),
       method,
-      ...opts,
-      parties: buildParties(opts.decisionContextDigest != null),
+      ...rest,
+      ...(aiInvocation ? { aiInvocation } : {}),
+      parties: buildParties(opts.decisionContextDigest != null, aiInvocation != null),
       previousHash: this.lastHash,
     };
 

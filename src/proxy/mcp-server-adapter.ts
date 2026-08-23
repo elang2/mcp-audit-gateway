@@ -76,6 +76,7 @@ export class McpServerAdapter {
       async (request) => {
         const principal = this.extractPrincipal(request.params?._meta);
         const traceContext = this.extractTraceContext(request.params?._meta);
+        const aiInvocation = this.extractAiInvocation(request.params?._meta);
         const toolName = request.params.name;
         const args = (request.params.arguments ?? {}) as Record<string, unknown>;
 
@@ -85,6 +86,7 @@ export class McpServerAdapter {
             args,
             principal,
             traceContext,
+            aiInvocation,
           );
 
           const upstreamResult = result as {
@@ -136,5 +138,23 @@ export class McpServerAdapter {
     if (!meta) return undefined;
     const tc = meta.traceContext as { traceparent?: string; tracestate?: string } | undefined;
     return tc;
+  }
+
+  private extractAiInvocation(
+    meta?: Record<string, unknown>,
+  ): { turnId?: string; invocationReason?: string; model?: string } | undefined {
+    if (!meta) return undefined;
+    const key = "io.modelcontextprotocol/aiInvocation";
+    const inv = meta[key] as Record<string, unknown> | undefined;
+    if (!inv) return undefined;
+    const result: { turnId?: string; invocationReason?: string; model?: string } = {};
+    if (typeof inv.turnId === "string") result.turnId = inv.turnId;
+    if (typeof inv.invocationReason === "string") result.invocationReason = inv.invocationReason;
+    if (typeof inv.model === "string") {
+      result.model = inv.model;
+    } else if (inv.model && typeof (inv.model as Record<string, unknown>).name === "string") {
+      result.model = (inv.model as Record<string, unknown>).name as string;
+    }
+    return Object.keys(result).length > 0 ? result : undefined;
   }
 }

@@ -75,6 +75,29 @@ if [ -f "$RUNNERS_DIR/serialize-sdk-go.go" ] && command -v go &>/dev/null; then
     "$WORKDIR/go-sdk-runner" > "$WORKDIR/go-sdk.jsonl" 2>/dev/null && LANGUAGES="$LANGUAGES go-sdk"
 fi
 
+if [ -f "$RUNNERS_DIR/serialize-sdk-swift.swift" ] && command -v swift &>/dev/null; then
+  swift "$RUNNERS_DIR/serialize-sdk-swift.swift" > "$WORKDIR/swift-sdk.jsonl" 2>/dev/null && LANGUAGES="$LANGUAGES swift-sdk"
+fi
+
+if [ -f "$RUNNERS_DIR/serialize-sdk-php.php" ] && command -v php &>/dev/null; then
+  php "$RUNNERS_DIR/serialize-sdk-php.php" > "$WORKDIR/php-sdk.jsonl" 2>/dev/null && LANGUAGES="$LANGUAGES php-sdk"
+fi
+
+if [ -f "$RUNNERS_DIR/serialize-sdk-java.java" ] && command -v javac &>/dev/null; then
+  javac -cp "$RUNNERS_DIR/jackson-databind.jar:$RUNNERS_DIR/jackson-core.jar:$RUNNERS_DIR/jackson-annotations.jar" \
+    -d "$WORKDIR" "$RUNNERS_DIR/serialize-sdk-java.java" 2>/dev/null && \
+    java -cp "$WORKDIR:$RUNNERS_DIR/jackson-databind.jar:$RUNNERS_DIR/jackson-core.jar:$RUNNERS_DIR/jackson-annotations.jar" \
+    SerializeSdkJava > "$WORKDIR/java-sdk.jsonl" 2>/dev/null && LANGUAGES="$LANGUAGES java-sdk"
+fi
+
+if [ -f "$RUNNERS_DIR/serialize-sdk-kotlin.main.kts" ] && command -v kotlin &>/dev/null; then
+  kotlin "$RUNNERS_DIR/serialize-sdk-kotlin.main.kts" > "$WORKDIR/kotlin-sdk.jsonl" 2>/dev/null && LANGUAGES="$LANGUAGES kotlin-sdk"
+fi
+
+if [ -f "$RUNNERS_DIR/serialize-sdk-csharp.cs" ] && command -v dotnet &>/dev/null; then
+  dotnet-script "$RUNNERS_DIR/serialize-sdk-csharp.cs" > "$WORKDIR/csharp-sdk.jsonl" 2>/dev/null && LANGUAGES="$LANGUAGES csharp-sdk"
+fi
+
 LANGUAGES=$(echo "$LANGUAGES" | xargs)
 LANG_COUNT=$(echo "$LANGUAGES" | wc -w | xargs)
 

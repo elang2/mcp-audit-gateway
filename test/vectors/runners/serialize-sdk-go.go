@@ -85,7 +85,7 @@ func main() {
 
 		// Unicode
 		{"unicode_nfc", serialize("café")},
-		{"unicode_nfd", serialize("café")},
+		{"unicode_nfd", serialize("café")},
 		{"unicode_astral", serialize("😀")},
 		{"unicode_bmp_escape", serialize(" ")},
 		{"unicode_surrogate_pair", serialize("😀")},

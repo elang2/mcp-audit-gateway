@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 /**
  * APS action-ref-v1 conformance runner.
- * Adapted from: https://github.com/Agent-Authority-Conformance/aps-conformance-suite/tree/main/fixtures/cross-stack/action-ref-v1-negatives
+ * Adapted from:
+ *   - https://github.com/Agent-Authority-Conformance/aps-conformance-suite (Apache-2.0, host)
+ *   - https://github.com/giskard09/argentum-core (Apache-2.0, origin)
+ * See SOURCE.md in this directory for full provenance and license terms.
  *
  * Tests JCS (RFC 8785) canonical recomputation and fail-closed digest comparison.
  * No APS SDK dependency — uses the same SHA-256 + canonical-sort primitives

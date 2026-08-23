@@ -182,3 +182,7 @@ node test/vectors/aps-action-ref-v1.mjs     # 51 APS vectors
 ## License
 
 MIT
+
+The APS conformance fixtures (`test/vectors/aps-action-ref-v1-vectors.json`)
+are adapted from upstream Apache-2.0 sources. See
+[test/vectors/SOURCE.md](test/vectors/SOURCE.md) for provenance and terms.

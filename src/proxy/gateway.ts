@@ -65,6 +65,7 @@ export class Gateway {
         upstream.namespace,
         conn.tools,
       );
+      await this.checkToolIntegrity(conn.tools, upstream.namespace);
     } catch (err) {
       console.error(`Failed to connect to upstream ${upstream.name}: ${err}`);
     }
@@ -366,15 +367,6 @@ export class Gateway {
         annotations: tool.annotations,
       };
       this.toolCatalog.set(namespacedName, entry);
-
-      if (this.config.toolIntegrity.enabled) {
-        this.toolIntegrity.checkAndUpdate(namespacedName, namespace, {
-          name: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema,
-          annotations: tool.annotations,
-        });
-      }
     }
 
     if (!this.manualStatuses) this.manualStatuses = new Map();

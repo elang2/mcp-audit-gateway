@@ -91,10 +91,28 @@ for (const vec of vectors.negative) {
       failed++;
     }
   } else if (vec.type === "must_reject") {
-    // These test invalid inputs — the vector file describes them but
-    // they cannot be represented as valid JSON. Skip with note.
-    console.log(`  ~ ${vec.id}: ${vec.description} (validation-level, skipped in JSON verifier)`);
-    skipped++;
+    if (vec.tool) {
+      try {
+        computeDigest(vec.tool);
+        // If we get here, check if the tool contains surrogates that should reject
+        const toolStr = JSON.stringify(vec.tool);
+        const hasSurrogate = /[\uD800-\uDFFF]/.test(toolStr);
+        if (hasSurrogate) {
+          console.log(`  ✗ ${vec.id}: ${vec.description} — should have rejected but produced a digest`);
+          failed++;
+        } else {
+          // Value was normalized by JSON parse (e.g., >2^53 rounded) — can't test from JSON
+          console.log(`  ~ ${vec.id}: ${vec.description} (value normalized at parse, skipped)`);
+          skipped++;
+        }
+      } catch (err) {
+        console.log(`  ✓ ${vec.id}: ${vec.description} (correctly rejected: ${err.message.slice(0, 60)})`);
+        passed++;
+      }
+    } else {
+      console.log(`  ~ ${vec.id}: ${vec.description} (no tool provided, skipped)`);
+      skipped++;
+    }
   }
 }
 

@@ -43,7 +43,7 @@ emit("null_byte", ser_value("\x00"));
 emit("unicode_nfc", ser_value("café"));
 emit("unicode_nfd", ser_value("cafe\xCC\x81"));
 emit("unicode_astral", ser_value("\xF0\x9F\x98\x80"));
-emit("unicode_bmp_escape", ser_value(" "));
+emit("unicode_bmp_escape", ser_value(" "));
 emit("unicode_surrogate_pair", ser_value("\xF0\x9F\x98\x80"));
 
 // Object structure

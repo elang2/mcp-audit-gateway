@@ -35,6 +35,7 @@ for entry in data:
     values = []
     for lang in languages:
         val = entry['results'].get(lang, '—')
+        val = str(val)
         if len(val) > 30:
             val = val[:27] + '...'
         val = val.replace('|', '\\\\|')

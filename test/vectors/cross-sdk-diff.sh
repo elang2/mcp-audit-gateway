@@ -4,8 +4,11 @@
 # and reports where they disagree.
 #
 # Usage:
-#   ./cross-sdk-diff.sh          # colored terminal output
-#   ./cross-sdk-diff.sh --json   # structured JSON output
+#   ./cross-sdk-diff.sh                    # all available runners
+#   ./cross-sdk-diff.sh --json             # structured JSON output
+#   ./cross-sdk-diff.sh --layer stdlib     # stdlib runners only
+#   ./cross-sdk-diff.sh --layer sdk        # SDK-level runners only
+#   ./cross-sdk-diff.sh --layer all        # both (default)
 #
 # Adding a language: create runners/serialize.<ext> that outputs
 # JSON lines: {"test": "name", "result": "serialized_value"}
@@ -14,14 +17,19 @@ set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 RUNNERS_DIR="$DIR/runners"
 JSON_MODE=0
+LAYER="all"
 TMPDIR="${TMPDIR:-/tmp}"
 WORKDIR="$TMPDIR/mcp-diff-$$"
 mkdir -p "$WORKDIR"
 trap 'rm -rf "$WORKDIR"' EXIT
 
-if [[ "${1:-}" == "--json" ]]; then
-  JSON_MODE=1
-fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --json) JSON_MODE=1; shift ;;
+    --layer) LAYER="${2:-all}"; shift 2 ;;
+    *) shift ;;
+  esac
+done
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -30,7 +38,9 @@ NC='\033[0m'
 
 LANGUAGES=""
 
-# Detect and run available runners
+# --- Stdlib runners (language-level standard library behavior) ---
+if [[ "$LAYER" == "all" || "$LAYER" == "stdlib" ]]; then
+
 if [ -f "$RUNNERS_DIR/serialize.js" ] && command -v node &>/dev/null; then
   node "$RUNNERS_DIR/serialize.js" > "$WORKDIR/javascript.jsonl" 2>/dev/null && LANGUAGES="$LANGUAGES javascript"
 fi
@@ -65,7 +75,11 @@ if [ -f "$RUNNERS_DIR/serialize.pl" ] && command -v perl &>/dev/null; then
   PERL_HASH_SEED=0 perl "$RUNNERS_DIR/serialize.pl" > "$WORKDIR/perl.jsonl" 2>/dev/null && LANGUAGES="$LANGUAGES perl"
 fi
 
-# SDK-level runners (test actual SDK serialization paths, not just stdlib)
+fi # end stdlib layer
+
+# --- SDK-level runners (actual MCP SDK serialization paths) ---
+if [[ "$LAYER" == "all" || "$LAYER" == "sdk" ]]; then
+
 if [ -f "$RUNNERS_DIR/serialize-sdk-python.py" ] && command -v python3 &>/dev/null; then
   python3 "$RUNNERS_DIR/serialize-sdk-python.py" > "$WORKDIR/python-sdk.jsonl" 2>/dev/null && LANGUAGES="$LANGUAGES python-sdk"
 fi
@@ -93,6 +107,8 @@ fi
 if [ -f "$RUNNERS_DIR/serialize-sdk-kotlin.main.kts" ] && command -v kotlin &>/dev/null; then
   kotlin "$RUNNERS_DIR/serialize-sdk-kotlin.main.kts" > "$WORKDIR/kotlin-sdk.jsonl" 2>/dev/null && LANGUAGES="$LANGUAGES kotlin-sdk"
 fi
+
+fi # end sdk layer
 
 if [ -f "$RUNNERS_DIR/serialize-sdk-csharp.cs" ] && command -v dotnet &>/dev/null; then
   dotnet-script "$RUNNERS_DIR/serialize-sdk-csharp.cs" > "$WORKDIR/csharp-sdk.jsonl" 2>/dev/null && LANGUAGES="$LANGUAGES csharp-sdk"

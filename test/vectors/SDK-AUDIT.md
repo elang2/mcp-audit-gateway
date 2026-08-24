@@ -14,8 +14,8 @@ Complete audit of JSON serialization libraries and configurations across all 10 
 | Kotlin | `kotlinx.serialization.json` | `explicitNulls=false`, `encodeDefaults=true`, `isLenient=true`, `classDiscriminatorMode=NONE` | `kotlin-sdk-core/.../types/jsonUtils.kt` | Kotlin 2.0.21, kotlinx.serialization 1.6.3 |
 | C# | `System.Text.Json` | `JsonSerializerDefaults.Web`, `DefaultIgnoreCondition=WhenWritingNull`, `AllowReadingFromString` | `src/ModelContextProtocol.Core/McpJsonUtilities.cs` | .NET 8.0 |
 | PHP | `json_encode()` | StdioTransport: `JSON_THROW_ON_ERROR` only; StatelessResponder adds `JSON_UNESCAPED_SLASHES` | `src/Server/Transport/StdioTransport.php` | PHP 8.3 |
-| Ruby | stdlib `JSON.generate` | No custom options | `lib/mcp/server/transports/stdio_transport.rb` | (matches TypeScript output) |
-| Rust | `serde_json` | Default `to_writer` | `crates/rmcp/src/transport/async_rw.rs` | (matches TypeScript output) |
+| Ruby | stdlib `JSON.generate` | No custom options | `lib/mcp/server/transports/stdio_transport.rb` | Ruby 3.3, mcp gem 1.3.0, stdlib JSON |
+| Rust | `serde_json` | Default `to_writer` | `crates/rmcp/src/transport/async_rw.rs` | rmcp 3.1.4, serde_json 1.0, Rust 1.88 |
 
 ## Verified SDK-Level Divergences (8 SDKs, 40 tests)
 

@@ -80,6 +80,10 @@ fi # end stdlib layer
 # --- SDK-level runners (actual MCP SDK serialization paths) ---
 if [[ "$LAYER" == "all" || "$LAYER" == "sdk" ]]; then
 
+if [ -f "$RUNNERS_DIR/serialize-sdk-typescript.js" ] && command -v node &>/dev/null; then
+  node "$RUNNERS_DIR/serialize-sdk-typescript.js" > "$WORKDIR/typescript-sdk.jsonl" 2>/dev/null && LANGUAGES="$LANGUAGES typescript-sdk"
+fi
+
 if [ -f "$RUNNERS_DIR/serialize-sdk-python.py" ] && command -v python3 &>/dev/null; then
   python3 "$RUNNERS_DIR/serialize-sdk-python.py" > "$WORKDIR/python-sdk.jsonl" 2>/dev/null && LANGUAGES="$LANGUAGES python-sdk"
 fi
@@ -108,18 +112,22 @@ if [ -f "$RUNNERS_DIR/serialize-sdk-kotlin.main.kts" ] && command -v kotlin &>/d
   kotlin "$RUNNERS_DIR/serialize-sdk-kotlin.main.kts" > "$WORKDIR/kotlin-sdk.jsonl" 2>/dev/null && LANGUAGES="$LANGUAGES kotlin-sdk"
 fi
 
-fi # end sdk layer
-
 if [ -f "$RUNNERS_DIR/serialize-sdk-csharp.cs" ] && command -v dotnet &>/dev/null; then
   dotnet-script "$RUNNERS_DIR/serialize-sdk-csharp.cs" > "$WORKDIR/csharp-sdk.jsonl" 2>/dev/null && LANGUAGES="$LANGUAGES csharp-sdk"
 fi
+
+fi # end sdk layer
 
 LANGUAGES=$(echo "$LANGUAGES" | xargs)
 LANG_COUNT=$(echo "$LANGUAGES" | wc -w | xargs)
 
 if [ "$LANG_COUNT" -lt 2 ]; then
   echo "ERROR: Need at least 2 languages. Found: ${LANGUAGES:-none}"
-  echo "Required: node + python3. Optional: ruby, php, go"
+  if [[ "$LAYER" == "sdk" ]]; then
+    echo "SDK mode requires node (TypeScript reference) + at least one other SDK runtime (python3, go, swift, php, javac, kotlin, dotnet)"
+  else
+    echo "Required: node + python3. Optional: ruby, php, go, swift, javac"
+  fi
   exit 1
 fi
 

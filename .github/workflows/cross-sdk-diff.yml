@@ -46,9 +46,12 @@ jobs:
       - name: Run cross-SDK differential tests
         run: |
           chmod +x test/vectors/cross-sdk-diff.sh
+          set +e
           test/vectors/cross-sdk-diff.sh 2>&1 | tee /tmp/diff-output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          set -e
           echo "---"
-          echo "Exit code: $?"
+          echo "Divergences found: $EXIT_CODE"
 
       - name: Generate results matrix
         run: |
@@ -63,4 +66,14 @@ jobs:
             test/vectors/RESULTS.md
 
       - name: Post JSON results
-        run: test/vectors/cross-sdk-diff.sh --json > /tmp/results.json && cat /tmp/results.json | python3 -c "import sys,json; d=json.loads(sys.stdin.read()); print(f'Tests: {len(d)}, Divergences: {sum(1 for x in d if not x[\"agree\"])}')"
+        run: |
+          set +e
+          test/vectors/cross-sdk-diff.sh --json > /tmp/results.json
+          set -e
+          python3 -c "
+          import json
+          with open('/tmp/results.json') as f:
+              d = json.load(f)
+          divs = sum(1 for x in d if not x['agree'])
+          print(f'Tests: {len(d)}, Divergences: {divs}')
+          "

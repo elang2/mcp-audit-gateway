@@ -1,6 +1,10 @@
 # mcp-audit
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22070815.svg)](https://doi.org/10.5281/zenodo.22070815)
+[![npm version](https://img.shields.io/npm/v/@mcp-audit-gateway/core)](https://www.npmjs.com/package/@mcp-audit-gateway/core)
+[![npm downloads](https://img.shields.io/npm/dm/@mcp-audit-gateway/core)](https://www.npmjs.com/package/@mcp-audit-gateway/core)
+[![CI](https://github.com/elang2/mcp-audit-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/elang2/mcp-audit-gateway/actions/workflows/ci.yml)
+[![GitHub stars](https://img.shields.io/github/stars/elang2/mcp-audit-gateway)](https://github.com/elang2/mcp-audit-gateway/stargazers)
 
 Your AI agent made 847 tool calls yesterday. Can you verify what it did?
 

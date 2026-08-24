@@ -155,19 +155,199 @@ Checkpoint records let a consumer detect tail truncation by stashing a single ha
 
 The canonical form is type-tagged and injective, avoids JCS's float-formatting problem by rejecting unsafe numbers entirely, and has proven cross-language parity via 46 conformance vectors (JS + Python). See [SECURITY-DESIGN.md](docs/SECURITY-DESIGN.md) for the full specification and threat model.
 
-## Cross-SDK differential testing
+## Cross-SDK differential testing (10 SDKs, 26 divergences)
 
-MCP has 10 official SDKs and no cross-SDK conformance testing. We built a Wycheproof-style differential harness that runs 40 serialization edge-case tests across all 10 SDKs and reports where they disagree.
+MCP has 10 official SDKs and no cross-SDK conformance testing. We built a [Wycheproof](https://github.com/google/wycheproof)-style differential harness that runs 40 serialization edge-case tests across all 10 SDKs and reports where they disagree.
 
-Results: 26 wire-level divergences across 8 distinct serializers. Six different representations of `1e20`. Three incompatible key-ordering algorithms. TypeScript silently loses integer precision at 2^53+1. C# HTML-escapes characters no other SDK escapes. The Python SDK produces different bytes across pydantic-core versions for the same code path.
+**Result: 26 wire-level divergences across 8 distinct serializers.**
 
-```bash
-./test/vectors/cross-sdk-diff.sh              # full matrix (stdlib + SDK)
-./test/vectors/cross-sdk-diff.sh --layer sdk  # SDK-wire-level only
-./test/vectors/cross-sdk-diff.sh --json       # structured output
+### Headline findings
+
+| Category | What we found |
+|----------|--------------|
+| Float formatting | 6 SDKs produce 6 different wire representations of `1e20` |
+| Key ordering | 3 incompatible algorithms (insertion, lexicographic, numeric-aware) |
+| Integer precision | TypeScript silently loses precision at 2^53+1 |
+| String encoding | C# HTML-escapes `<>&`, PHP escapes `/`, Python escapes all non-ASCII |
+| Null handling | Kotlin drops null fields entirely, Swift preserves them |
+
+### Float divergence example (`1e20`)
+
+```
+TypeScript:  100000000000000000000
+Python:      1e20
+Swift:       1e+20
+Java:        1.0E20
+C#:          1E+20
+PHP:         1.0e+20
 ```
 
-The audit gateway's canonicalization was designed to be immune to all 26 divergence classes: safe integers only, explicit field order, surrogate rejection. See [SDK-AUDIT.md](test/vectors/SDK-AUDIT.md) for the full divergence table and methodology.
+Six SDKs, six different bytes on the wire. If your hash-chain implementation assumes consistent serialization across SDKs, it breaks silently.
+
+### SDKs tested
+
+| SDK | Serializer | Version tested |
+|-----|-----------|----------------|
+| TypeScript | `JSON.stringify` (V8) | Node 22.20.0 |
+| Python | pydantic-core (Rust serde) | pydantic 2.10.3 |
+| Go | `encoding/json` | Go 1.24.1 |
+| Swift | Foundation `JSONEncoder` | Swift 6.1.2 |
+| Java | Jackson 2 | OpenJDK 21, Jackson 2.18.2 |
+| Kotlin | `kotlinx.serialization` | Kotlin 2.0.21 |
+| C# | `System.Text.Json` | .NET 8.0 |
+| PHP | `json_encode()` | PHP 8.3 |
+| Ruby | stdlib `JSON.generate` | Ruby 3.3 |
+| Rust | `serde_json` | rmcp 3.1.4, Rust 1.88 |
+
+### Run it yourself
+
+```bash
+# Clone and run the full matrix
+git clone https://github.com/elang2/mcp-audit-gateway.git
+cd mcp-audit-gateway && npm ci
+
+./test/vectors/cross-sdk-diff.sh              # full matrix (stdlib + SDK layers)
+./test/vectors/cross-sdk-diff.sh --layer sdk  # SDK wire-level only
+./test/vectors/cross-sdk-diff.sh --json       # machine-readable output
+```
+
+Output shows per-test agreement/divergence across all SDKs with exact byte representations.
+
+### Use in your CI
+
+Drop this into `.github/workflows/cross-sdk-conformance.yml` to catch serialization regressions in your own MCP server or client:
+
+```yaml
+name: Cross-SDK Conformance
+on: [push, pull_request]
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install mcp-audit-gateway
+        run: npm install @mcp-audit-gateway/core
+
+      - name: Run cross-SDK differential tests
+        run: |
+          npx cross-sdk-diff --json > results.json
+          npx cross-sdk-diff
+
+      - name: Fail on new divergences
+        run: |
+          DIVS=$(python3 -c "
+          import json
+          with open('results.json') as f:
+              d = json.load(f)
+          print(sum(1 for x in d if not x['agree']))
+          ")
+          echo "Divergences found: $DIVS"
+          if [ "$DIVS" -gt 26 ]; then
+            echo "ERROR: New divergences detected (was 26, now $DIVS)"
+            exit 1
+          fi
+```
+
+Or run just the conformance vectors (no language SDKs required, only Node.js):
+
+```yaml
+name: Canonicalization Conformance
+on: [push, pull_request]
+
+jobs:
+  vectors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm test
+      - run: node test/vectors/verify-checkpoint.mjs
+      - run: node test/vectors/aps-action-ref-v1.mjs
+```
+
+### Methodology
+
+The harness uses a Wycheproof-inspired approach: define edge-case inputs (floats at precision boundaries, non-ASCII strings, nested key orders), serialize them through each SDK's actual JSON encoder, and compare the raw bytes. No mocking. Each SDK runner imports the real serialization library that the official MCP SDK uses in production.
+
+Full divergence table with per-test byte comparisons: [SDK-AUDIT.md](test/vectors/SDK-AUDIT.md)
+
+The audit gateway's canonicalization was designed to be immune to all 26 divergence classes: safe integers only (eliminates float formatting), explicit field order (eliminates sort disagreements), surrogate rejection (eliminates encoding divergences). See [SECURITY-DESIGN.md](docs/SECURITY-DESIGN.md) for the threat model.
+
+## Examples
+
+### Verify your canonicalization against ours
+
+```javascript
+import { canonicalize } from '@mcp-audit-gateway/core';
+
+const record = {
+  method: 'tools/call',
+  toolName: 'github/create_pr',
+  args: { title: 'Fix bug', body: '...' },
+  timestamp: '2026-08-16T14:32:01.000Z'
+};
+
+const canonical = canonicalize(record);
+// Deterministic bytes regardless of key insertion order,
+// float formatting, or platform JSON encoder
+```
+
+### Python verification (cross-language parity)
+
+```python
+from mcp_audit_gateway import verify_chain
+
+results = verify_chain("/path/to/audit.jsonl")
+assert results.valid == results.total
+assert results.chain_breaks == 0
+```
+
+### Run the conformance vectors against your own implementation
+
+```bash
+# 46 cross-language vectors (JS + Python must agree on every hash)
+node test/vectors/verify-checkpoint.mjs
+python3 test/vectors/verify-checkpoint.py
+
+# 51 APS action-ref-v1 vectors
+node test/vectors/aps-action-ref-v1.mjs
+
+# Full 10-SDK matrix
+./test/vectors/cross-sdk-diff.sh
+```
+
+### Docker (self-contained, no host dependencies)
+
+```bash
+docker build -f test/vectors/Dockerfile -t cross-sdk-diff .
+docker run --rm cross-sdk-diff
+```
 
 ## Conformance
 

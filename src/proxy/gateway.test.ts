@@ -113,6 +113,45 @@ describe("Gateway", () => {
         expect(record.parties).toContainEqual({ party: "client", role: "asserter", scope: ["aiInvocation"] });
       }
     });
+
+    it("party provenance boundary: no client-asserted field in gateway witness scope", async () => {
+      const aiInvocation = { turnId: "turn-xyz", invocationReason: "test", model: "gpt-4o" };
+      try {
+        await gateway.handleToolsCall("test/dangerous_tool", {}, "agent:blocked", undefined, aiInvocation);
+      } catch (err: unknown) {
+        const record = (err as { auditRecord: { parties?: Array<{ party: string; role: string; scope: string[] }> } }).auditRecord;
+        const gatewayParty = record.parties?.find(p => p.party === "gateway" && p.role === "witness");
+        const clientParty = record.parties?.find(p => p.party === "client" && p.role === "asserter");
+        expect(gatewayParty).toBeDefined();
+        expect(clientParty).toBeDefined();
+        expect(gatewayParty!.scope).not.toContain("aiInvocation");
+        expect(clientParty!.scope).not.toContain("id");
+        expect(clientParty!.scope).not.toContain("timestamp");
+        expect(clientParty!.scope).not.toContain("toolName");
+        expect(clientParty!.scope).not.toContain("success");
+        const overlap = gatewayParty!.scope.filter(f => clientParty!.scope.includes(f));
+        expect(overlap).toHaveLength(0);
+      }
+    });
+
+    it("party provenance boundary: reduction across boundary produces weaker claim", async () => {
+      const aiInvocation = { turnId: "turn-reduce", invocationReason: "reduction test", model: "mock" };
+      try {
+        await gateway.handleToolsCall("test/dangerous_tool", {}, "agent:blocked", undefined, aiInvocation);
+      } catch (err: unknown) {
+        const record = (err as { auditRecord: { parties?: Array<{ party: string; role: string; scope: string[] }>; aiInvocation?: { turnId?: string } } }).auditRecord;
+        const allWitnessedFields = record.parties
+          ?.filter(p => p.role === "witness")
+          .flatMap(p => p.scope) ?? [];
+        const allAssertedFields = record.parties
+          ?.filter(p => p.role === "asserter")
+          .flatMap(p => p.scope) ?? [];
+        expect(allWitnessedFields.length).toBeGreaterThan(0);
+        expect(allAssertedFields.length).toBeGreaterThan(0);
+        expect(allAssertedFields).toContain("aiInvocation");
+        expect(allWitnessedFields).not.toContain("aiInvocation");
+      }
+    });
   });
 
   describe("status", () => {

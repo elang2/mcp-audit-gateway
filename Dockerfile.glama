@@ -8,4 +8,4 @@ RUN npm ci --omit=dev
 COPY . .
 RUN npm run build
 
-ENTRYPOINT ["node", "dist/cli.js", "wrap", "--", "node", "-e", "process.stdin.resume()"]
+ENTRYPOINT ["node", "glama-demo-server.mjs"]

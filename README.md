@@ -155,6 +155,20 @@ Checkpoint records let a consumer detect tail truncation by stashing a single ha
 
 The canonical form is type-tagged and injective, avoids JCS's float-formatting problem by rejecting unsafe numbers entirely, and has proven cross-language parity via 46 conformance vectors (JS + Python). See [SECURITY-DESIGN.md](docs/SECURITY-DESIGN.md) for the full specification and threat model.
 
+## Cross-SDK differential testing
+
+MCP has 10 official SDKs and no cross-SDK conformance testing. We built a Wycheproof-style differential harness that runs 40 serialization edge-case tests across all 10 SDKs and reports where they disagree.
+
+Results: 26 wire-level divergences across 8 distinct serializers. Six different representations of `1e20`. Three incompatible key-ordering algorithms. TypeScript silently loses integer precision at 2^53+1. C# HTML-escapes characters no other SDK escapes. The Python SDK produces different bytes across pydantic-core versions for the same code path.
+
+```bash
+./test/vectors/cross-sdk-diff.sh              # full matrix (stdlib + SDK)
+./test/vectors/cross-sdk-diff.sh --layer sdk  # SDK-wire-level only
+./test/vectors/cross-sdk-diff.sh --json       # structured output
+```
+
+The audit gateway's canonicalization was designed to be immune to all 26 divergence classes: safe integers only, explicit field order, surrogate rejection. See [SDK-AUDIT.md](test/vectors/SDK-AUDIT.md) for the full divergence table and methodology.
+
 ## Conformance
 
 This implementation satisfies the following properties (verified by cross-language conformance vectors and unit tests):
@@ -175,10 +189,11 @@ APS action-ref-v1 conformance: 51/51 vectors passing (JCS recomputation + fail-c
 ## Testing
 
 ```bash
-npm test                                    # 149 unit tests
-node test/vectors/verify-checkpoint.mjs     # 46 JS conformance vectors
-python3 test/vectors/verify-checkpoint.py   # 46 Python conformance vectors
+npm test                                    # unit tests
+node test/vectors/verify-checkpoint.mjs     # JS conformance vectors
+python3 test/vectors/verify-checkpoint.py   # Python conformance vectors
 node test/vectors/aps-action-ref-v1.mjs     # 51 APS vectors
+./test/vectors/cross-sdk-diff.sh            # 10-SDK differential test
 ```
 
 ## License

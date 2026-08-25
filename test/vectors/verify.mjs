@@ -1,3 +1,11 @@
+/**
+ * Cross-language verification of mcp-audit-gateway conformance vectors.
+ *
+ * Chain continuity: hash stored line octets (octets-first, no re-serialization).
+ * Canonical form: recompute from parsed record (generate/verify split).
+ * Producer conformance: verify JS native stringify reproduces stored octets.
+ */
+
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";

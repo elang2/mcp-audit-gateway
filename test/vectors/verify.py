@@ -257,17 +257,18 @@ if "party_attribution" in vectors and "chain_with_parties" in vectors["party_att
                 print(f"    canonical hash mismatch")
             failed += 1
 
-        reference_json = entry["full_record_json"]
-        reference_hash = sha256_hex(reference_json)
-        chain_match = reference_hash == entry["record_hash"]
+        # Verify chain continuity via stored line octets (octets-first)
+        stored_line_octets = entry["full_record_json"]
+        chain_hash = sha256_hex(stored_line_octets)
+        chain_match = chain_hash == entry["record_hash"]
 
         if chain_match:
-            print(f"  PASS: chain_with_parties[{i}] record_hash ({record['toolName']})")
+            print(f"  PASS: chain_with_parties[{i}] continuity via stored octets ({record['toolName']})")
             passed += 1
         else:
-            print(f"  FAIL: chain_with_parties[{i}] record_hash ({record['toolName']})")
+            print(f"  FAIL: chain_with_parties[{i}] chain continuity (octets mismatch)")
             print(f"    expected: {entry['record_hash']}")
-            print(f"    got:      {reference_hash}")
+            print(f"    got:      {chain_hash}")
             failed += 1
 
         if i == 0:

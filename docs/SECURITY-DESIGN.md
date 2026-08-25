@@ -96,6 +96,22 @@ A `chain_break` record is signed evidence of a discontinuity. It converts "gap i
 
 **Relative mode**: only a suffix of the chain available (e.g., after rotation or partial delivery). Verifies adjacent deltas and sequence monotonicity within the suffix. Reports `absoluteCountVerified: false` to signal that the consumer received an honestly-downgraded result, not a silently-incomplete one.
 
+## Dual-Path Verification Architecture
+
+Chain verification and signature verification serve different purposes and use different hash inputs.
+
+**Chain continuity (octets-first):** Each record's `previousHash` must equal `SHA-256(stored bytes of prior line)`. The verifier hashes the raw JSONL line as written to disk, with no parse/re-serialize round-trip. This eliminates cross-language serialization fragility: any implementation that can read bytes and compute SHA-256 can verify chain continuity, regardless of its JSON library's key-ordering or whitespace behavior.
+
+`verifyChainLines(lines)` implements this path. `verifyAuditLog(path, signer, {verifyChain: true})` also uses raw-line hashing internally.
+
+**Signature verification (canonical form):** The attestation signature covers the canonical form of the record (type-tagged, positionally-ordered, sans attestation field). Verifying a signature requires recomputing this canonical form from the parsed record. This is correct because the producer computed the signature the same way.
+
+`verifyAuditLog(path, signer)` implements this path (strips attestation, canonicalizes, verifies).
+
+**Why the separation matters:** A re-serialization-based chain verifier would appear to work in single-language deployments (where `JSON.stringify` is deterministic). It breaks silently when logs are produced by one language and verified by another, because `JSON.stringify(JSON.parse(line))` is not guaranteed to reproduce the original bytes. The octets-first approach avoids this entire class of fragility.
+
+`verifyChain(records)` is retained as a convenience for callers who only have pre-parsed records. It uses `JSON.stringify` re-serialization and is correct only when key insertion-order is preserved (guaranteed in V8/Node.js for string keys). Callers with access to raw lines should prefer `verifyChainLines`.
+
 ## Pitfalls Found During Design Review
 
 These are the non-obvious bugs discovered across six rounds of adversarial review. Each required a design change, not just a code fix.

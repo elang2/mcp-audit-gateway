@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.7.0] - 2026-08-24
+
+### Changed
+
+- Chain continuity verification now hashes raw stored line bytes (octets-first) instead of re-serializing parsed JSON. Eliminates cross-language round-trip fragility where `JSON.stringify(JSON.parse(line))` may not reproduce original bytes.
+
+### Added
+
+- `verifyChainLines(lines: string[])`: new primary API for octets-based chain verification. Hashes stored bytes directly with no parse/re-serialize step.
+- `verifyChain(records)` and `verifyChainLines(lines)` now both exported from package index.
+- SECURITY-DESIGN.md: new "Dual-Path Verification Architecture" section documenting the separation between chain continuity (octets) and signature verification (canonical form).
+
+### Fixed
+
+- `verifyAuditLog` with `verifyChain: true` previously used `hashRecord()` (re-serialization) for chain hash computation. Now uses raw line bytes, matching how the producer computed `previousHash`.
+
 ## [0.2.0] - 2026-08-22
 
 ### Added

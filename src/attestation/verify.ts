@@ -1,9 +1,14 @@
+import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
 import type { AuditRecord, CheckpointRecord, ChainBreakRecord, ChainRecord } from "../types.js";
 import { isCheckpoint, isChainBreak } from "../types.js";
 import { HmacSigner, Ed25519Signer, type Signer } from "./signer.js";
 import { hashRecord } from "./audit-log.js";
+
+function hashLine(line: string): string {
+  return createHash("sha256").update(line).digest("hex");
+}
 
 export interface VerifyResult {
   total: number;
@@ -91,7 +96,7 @@ export async function verifyAuditLog(
           });
         }
       }
-      previousHash = hashRecord(record);
+      previousHash = hashLine(line);
     }
   }
 
@@ -103,6 +108,71 @@ function getRecordPreviousHash(record: ChainRecord): string | undefined {
   return (record as AuditRecord | CheckpointRecord).previousHash;
 }
 
+/**
+ * Verify chain continuity from raw JSONL lines (octets-first).
+ * Hashes stored bytes directly — no parse/re-serialize round-trip.
+ */
+export async function verifyChainLines(lines: string[]): Promise<ChainVerifyResult> {
+  const nonEmpty = lines.filter((l) => l.trim());
+  const result: ChainVerifyResult = { total: nonEmpty.length, valid: true, errors: [] };
+
+  for (let i = 0; i < nonEmpty.length; i++) {
+    const line = nonEmpty[i];
+    const lineNum = i + 1;
+
+    let record: ChainRecord;
+    try {
+      record = JSON.parse(line);
+    } catch {
+      result.valid = false;
+      result.errors.push({ line: lineNum, id: "?", reason: "invalid JSON" });
+      continue;
+    }
+
+    if (isChainBreak(record)) {
+      if (i !== 0) {
+        result.valid = false;
+        result.errors.push({
+          line: lineNum,
+          id: record.id,
+          reason: "chain_break record must be at position 0",
+        });
+      }
+      continue;
+    }
+
+    const prevHash = getRecordPreviousHash(record);
+    if (i === 0) {
+      if (prevHash !== "genesis") {
+        result.valid = false;
+        result.errors.push({
+          line: lineNum,
+          id: record.id,
+          reason: "first record previousHash must be \"genesis\"",
+        });
+      }
+    } else {
+      const expectedHash = hashLine(nonEmpty[i - 1]);
+      if (prevHash !== expectedHash) {
+        result.valid = false;
+        result.errors.push({
+          line: lineNum,
+          id: record.id,
+          reason: "previousHash does not match hash of prior record",
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Verify chain continuity from pre-parsed records.
+ * Uses JSON.stringify re-serialization — correct only when insertion-order
+ * is preserved (guaranteed in V8/Node.js for integer-free keys).
+ * Prefer verifyChainLines() when raw JSONL lines are available.
+ */
 export async function verifyChain(records: ChainRecord[]): Promise<ChainVerifyResult> {
   const result: ChainVerifyResult = { total: records.length, valid: true, errors: [] };
 
@@ -110,7 +180,6 @@ export async function verifyChain(records: ChainRecord[]): Promise<ChainVerifyRe
     const record = records[i];
     const lineNum = i + 1;
 
-    // chain_break records are valid chain starts (no previousHash required)
     if (isChainBreak(record)) {
       if (i !== 0) {
         result.valid = false;

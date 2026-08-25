@@ -6,7 +6,7 @@ export { PolicyEngine, computeDecisionContextDigest, type DecisionContext } from
 export { AuditLog } from "./attestation/audit-log.js";
 export { createSigner, HmacSigner, Ed25519Signer } from "./attestation/signer.js";
 export { ToolIntegrityMonitor } from "./attestation/tool-integrity.js";
-export { verifyAuditLog } from "./attestation/verify.js";
+export { verifyAuditLog, verifyChainLines, verifyChain } from "./attestation/verify.js";
 export { generateKeyPair } from "./attestation/keygen.js";
 export { GatewayTracer } from "./telemetry/tracer.js";
 export {

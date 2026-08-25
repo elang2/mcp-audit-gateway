@@ -1,6 +1,6 @@
 {
   "name": "@mcp-audit-gateway/core",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "MCP audit and attestation gateway — transparent proxy with cryptographic attestation, policy enforcement, and OTel export",
   "type": "module",
   "main": "dist/index.js",

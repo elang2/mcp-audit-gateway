@@ -2,9 +2,9 @@
 """
 Cross-language verification of mcp-audit-gateway conformance vectors.
 
-Proves the tuple-array canonical form is reproducible outside the
-original JavaScript implementation. Chain hashes are verified against
-the full_record_json reference string (avoiding insertion-order issues).
+Chain continuity: hash stored line octets (octets-first, no re-serialization).
+Canonical form: recompute from parsed record (generate/verify split).
+Proves tuple-array canonical form is reproducible across languages.
 """
 
 import hashlib
@@ -128,18 +128,18 @@ for i, entry in enumerate(vectors["chain"]["records"]):
             print(f"    canonical hash mismatch")
         failed += 1
 
-    # Verify chain hash against full_record_json reference
-    reference_json = entry["full_record_json"]
-    reference_hash = sha256_hex(reference_json)
-    chain_match = reference_hash == entry["record_hash"]
+    # Verify chain continuity via stored line octets (octets-first)
+    stored_line_octets = entry["full_record_json"]
+    chain_hash = sha256_hex(stored_line_octets)
+    chain_match = chain_hash == entry["record_hash"]
 
     if chain_match:
-        print(f"  PASS: chain[{i}] record_hash via reference JSON ({record['toolName']})")
+        print(f"  PASS: chain[{i}] continuity via stored octets ({record['toolName']})")
         passed += 1
     else:
-        print(f"  FAIL: chain[{i}] record_hash via reference JSON")
+        print(f"  FAIL: chain[{i}] chain continuity (octets mismatch)")
         print(f"    expected: {entry['record_hash']}")
-        print(f"    got:      {reference_hash}")
+        print(f"    got:      {chain_hash}")
         failed += 1
 
     # Verify chain linkage
@@ -350,5 +350,5 @@ if failed > 0:
 else:
     print("\nAll vectors verified cross-language (Python).")
     print("Canonical form: tuple-array, cross-language safe.")
-    print("Chain hash: verified via full_record_json reference string.")
+    print("Chain continuity: verified via stored line octets (octets-first).")
     sys.exit(0)

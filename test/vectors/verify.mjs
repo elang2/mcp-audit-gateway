@@ -122,28 +122,29 @@ for (let i = 0; i < vectors.chain.records.length; i++) {
     failed++;
   }
 
-  // Verify chain hash via full_record_json
-  const refHash = sha256Hex(entry.full_record_json);
-  if (refHash === entry.record_hash) {
-    console.log(`  PASS: chain[${i}] record_hash (${record.toolName})`);
+  // Verify chain continuity via stored line octets (octets-first)
+  const storedOctets = entry.full_record_json;
+  const chainHash = sha256Hex(storedOctets);
+  if (chainHash === entry.record_hash) {
+    console.log(`  PASS: chain[${i}] continuity via stored octets (${record.toolName})`);
     passed++;
   } else {
-    console.log(`  FAIL: chain[${i}] record_hash (${record.toolName})`);
+    console.log(`  FAIL: chain[${i}] continuity (octets mismatch) (${record.toolName})`);
     console.log(`    expected: ${entry.record_hash}`);
-    console.log(`    got:      ${refHash}`);
+    console.log(`    got:      ${chainHash}`);
     failed++;
   }
 
-  // Verify native JSON.stringify produces same hash
+  // Producer conformance: verify JS native stringify reproduces stored octets
   const nativeJson = JSON.stringify(record);
   const nativeHash = sha256Hex(nativeJson);
   if (nativeHash === entry.record_hash) {
-    console.log(`  PASS: chain[${i}] native stringify match (${record.toolName})`);
+    console.log(`  PASS: producer[${i}] conformance (JS stringify) (${record.toolName})`);
     passed++;
   } else {
-    console.log(`  FAIL: chain[${i}] native stringify diverges (${record.toolName})`);
-    console.log(`    reference: ${entry.full_record_json}`);
-    console.log(`    native:    ${nativeJson}`);
+    console.log(`  FAIL: producer[${i}] JS stringify diverges (${record.toolName})`);
+    console.log(`    stored:  ${entry.full_record_json}`);
+    console.log(`    native:  ${nativeJson}`);
     failed++;
   }
 

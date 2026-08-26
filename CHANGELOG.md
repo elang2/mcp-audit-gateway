@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.1] - 2026-08-25
+
+### Added
+
+- Equivalence test: `verifyChain` and `verifyChainLines` agree on writer-emitted records, pinning the invariant that both paths converge for records this codebase produces.
+- Divergence test: on foreign records with integer-like top-level keys, `verifyChainLines` passes while `verifyChain` reports a chain mismatch — per ECMA-262 §10.1.11.1 (OrdinaryOwnPropertyKeys), integer-indexed properties enumerate before string keys, so `JSON.stringify(JSON.parse(line))` produces different bytes than the stored line. Fixture is hand-crafted JSONL that bypasses the writer; the current `AuditRecord` interface admits no place for such keys, so this pins receiver-side behavior on shapes another implementation could emit.
+
+### Changed
+
+- `verifyChain` JSDoc strengthened with a "Prefer `verifyChainLines` (since 0.7.1)" note and a broader retention rationale covering records received as JSON objects rather than raw JSONL lines. No `@deprecated` tag — the boundary is enforced by the equivalence and divergence tests above, not by a removal-path marker on a function that has legitimate current callers.
+
 ## [0.7.0] - 2026-08-24
 
 ### Changed

@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.8.0] - 2026-08-26
+
+### Added
+
+- Witness projection: a deterministic role/party-scoped projection of an `AuditRecord`. New exports from `src/attestation/witness.ts` (also re-exported from the package entry):
+  - `projectByRole(record, role, party?)`: returns a `WitnessProjection` covering only the fields attributed to the named role (optionally further refined by party). Distinct type from `AuditRecord`.
+  - `projectionDigest(projection)`: deterministic canonical digest of a projection, domain-tagged so it cannot collide with a record digest by construction (records serialize as `{...}`; projections wrap as `[TAG, canonical]` starting with `[`). Reuses the shipped `canonicalizeValue` for the value canonicalization; adds an outer `[TAG, canonical]` array wrap serialized via `JSON.stringify` for domain separation from records. Cross-language re-implementers must replicate both. Non-integer numbers, unsafe integers, and lone surrogates in projected fields all throw. This is the same producer requirement Vector 2 of the C-REC harness enforces on records.
+  - `rolesInRecord(record)`, `partiesForRole(record, role)`, `scopeForRoleAndParty(record, role, party?)`: enumerate the `parties[]` axis. All three filter out entries with unknown role values (defensive against untrusted JSON input).
+  - `PROJECTION_DOMAIN_TAG`: exported constant so consumers can verify the domain tag without hardcoding.
+- `WitnessProjection` interface with mandatory type discriminant (`"witness-projection"`), `projectionOf` hash (points back to the source record via `hashRecord`), `role`, optional `party`, `scope`, and `fields`.
+- Tests at `src/attestation/witness.test.ts` covering: cross-scope leakage prevention, determinism, domain-separation negative (projection digest never equals any record digest), role-vs-party axis distinction, the reduction-preserves-scope pattern as an executable check, and runtime robustness (float `durationMs`, unknown role values in untrusted input, dotted-path scope entries currently returning undefined).
+
+### Rationale
+
+- The `parties[]` array shipped in v0.2.0 encodes multi-party attribution but consumers can silently collapse the witness/asserter distinction when aggregating. `projectByRole` is the read-side primitive consumers call to preserve scope boundaries under aggregation. It doesn't enforce use; nothing at the language level prevents a consumer from iterating `record.parties[]` directly. The primitive makes the scope-preserving path callable in a single line.
+- Design shape (distinct type + domain-tagged digest) was chosen over a nulled `AuditRecord` after adversarial review. A nulled record is type-indistinguishable from a legitimate partial record, which invites accidental rehash-as-record and cross-domain digest collision.
+- Projection is lossy for out-of-scope fields; in-scope fields are preserved verbatim in `fields`. `projectionOf` is the pointer back to the source record for cases requiring the full record.
+- Role-primary API with optional party refinement supports two consumer axes: role-level safety (as needed for e.g. the [SEP-2817](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2817) parties/witness discussion) and party-level field attribution (as needed for e.g. [CycloneDX/specification#1016](https://github.com/CycloneDX/specification/issues/1016) field-mapping approaches).
+- Field paths in `scope` are treated as top-level record keys. Dotted-path (nested-field) support is a follow-up if consumers need it; the current behavior returns `undefined` for dotted entries and is locked by test.
+
+### Downstream
+
+- Write-side regression tests at [commit `a87b09b`](https://github.com/elang2/mcp-audit-gateway/commit/a87b09b) assert scope arrays don't overlap and no cross-scope leakage on record ingest. `projectByRole` is the read-side primitive that consumes those record shapes to preserve the boundary under aggregation.
+- Verifiers in the shape of CycloneDX #1016's field-mapping approach can call `projectionDigest` to compute a scope-bounded digest independently from the record's own digest.
+
 ## [0.7.8] - 2026-08-26
 
 ### Added

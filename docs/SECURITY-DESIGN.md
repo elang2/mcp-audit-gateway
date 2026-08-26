@@ -140,3 +140,21 @@ Cross-language conformance is verified by two independent implementations:
 Both consume the same `test/vectors/checkpoint.json` vector file (46 vectors). The vectors cover: checkpoint canonicalization, chain hashing, truncation detection, canonicalizeValue (including astral-plane keys and surrogate rejection), extensions digest, rotation boundary, sequence regression, chain break, and verification modes.
 
 Adding a new implementation requires passing all 46 vectors. The astral-plane sort vector specifically catches implementations using code-point sort instead of UTF-16 code-unit sort.
+
+## Witness Projection
+
+Audit records carry multi-party attribution via the `parties[]` array (shipped in v0.2.0): each party has a `role` (`witness` | `asserter`), a `partyRef`, and a `scope` listing which fields it attests to. The distinction is present in the record bytes; downstream consumers can inspect it.
+
+The failure mode: consumers can silently collapse the distinction when aggregating. A dashboard counting successful calls without projecting to a role scope creates the illusion that a host's self-attestation is as reliable as the gateway's independent observation. The invariant that preserves the distinction is documentable in prose but is not machine-checkable without a scope-preserving read primitive.
+
+v0.8.0 adds `projectByRole(record, role, party?)` as the read-side primitive consumers call to preserve scope boundaries under aggregation. It returns a `WitnessProjection` type distinct from `AuditRecord`, so a projection cannot be mistaken for a record by the type system. The projection's canonical digest is computed via `projectionDigest(p)`, which wraps `canonicalizeValue(p)` as `JSON.stringify([PROJECTION_DOMAIN_TAG, canonical])`. The outer array wrap guarantees domain separation from record digests: records serialize as `{...}` via `hashRecord`; projections wrap as `[...]`. Cross-implementation re-implementers must replicate both the canonicalization and the outer wrap.
+
+### Related public discussion
+
+- `f270ca3` on the SEP-2817 branch (hangum's incorporation into the SEP text) documents the parties/witness normative sentences that this primitive enforces on the read side.
+- XuebinMa's Aug-24 comment on modelcontextprotocol/modelcontextprotocol#2817 ([issuecomment-5390870362](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2817#issuecomment-5390870362)) frames the same collapse-under-reducer failure mode from agent-guard's `ExecutionFinished` vs `ExecutionReported` split, and articulates the reduction-preserves-scope invariant this primitive implements. The comment further attributes the invariant's formalization to another venue; that upstream citation was not independently verified when this section was written.
+- CycloneDX/specification#1016 (Silentpartnercoding's [issuecomment-5417501633](https://github.com/CycloneDX/specification/issues/1016#issuecomment-5417501633)) presents a native-CycloneDX field-mapping approach for the same distinction, verified against a pinned schema hash. A field-mapping verifier can call `projectionDigest` to compute a scope-bounded digest independently from the record's own digest.
+
+### Producer-requirement contract
+
+`projectionDigest` propagates `canonicalizeValue`'s throw behavior to projections: non-integer numbers, unsafe integers, and lone surrogates in projected field values all raise `canonicalizeValue: unsafe number ...` or the surrogate-well-formedness error. This is the same producer requirement Vector 2 of the C-REC harness enforces on records. `AuditRecord.durationMs` is currently assigned via `Date.now() - startTime` in every production path (integer milliseconds by convention, not by type); a future change to a float source would surface here as an `unsafe number` throw.

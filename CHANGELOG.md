@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.7.8] - 2026-08-26
+
+### Added
+
+- Canonical Record Equivalence Check (C-REC) side-by-side harness at `test/vectors/c-rec/`. Companion to SEP-3004 ([modelcontextprotocol/modelcontextprotocol#3004](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/3004)). Runs the same input through GIF's sorted-JSON `canonicalize()` (used VERBATIM from vendored source, not reimplemented) and this repo's type-tagged M/L `canonicalizeValue`, showing byte-level divergence and SHA-256 digests. Test infrastructure only.
+- `test/vectors/c-rec/vendored/gif/audit-record-contract.ts`: [notboatanchor/gif](https://github.com/notboatanchor/gif) @ `e1f02a95506e81e7766c3ba3a684ecad7cfff12f` vendored byte-for-byte (14602 bytes, sha256 `ed4e75adecd71a6e6ec504b1ffb1b7d762c737e80515476bc76672fddbd46a77`). SPDX header, copyright header, Apache-2.0 licensing preserved. No modifications.
+- `test/vectors/c-rec/vendored/gif/LICENSE` and `NOTICE`: reproduced verbatim from upstream per Apache-2.0 §4(a) and §4(d).
+- `test/vectors/c-rec/SOURCE.md`: full provenance documentation. Apache-2.0 attribution, verification hash, notes on the KAT constants.
+- `test/vectors/c-rec/harness.ts`: imports `canonicalize` from the vendored file and `canonicalizeValue` from `src/attestation/signer.ts`. Defines KAT anchor, 11-row side-by-side fixture set, and five producer-requirement vectors (lone-surrogate, float, integer-like key, unsafe integer, decomposed vs precomposed café).
+- `test/vectors/c-rec/verify-kat.ts`: CI gate. Confirms GIF's vendored `canonicalize()` reproduces `KAT_HASH_CG` byte-for-byte and locks the accept/throw contract for each producer vector.
+- `test/vectors/c-rec/reports/build-comment-payload.ts`: generates a markdown payload for the SEP-3004 PR comment to reference at a tag URL.
+- `test/vectors/c-rec/reports/SEP-3004-comment-payload.md`: committed generated output.
+- `test/vectors/c-rec/PIN-HISTORY.md`: audit trail of GIF pin changes. Seeded with `e1f02a9` initial pin.
+- `test/vectors/c-rec/README.md`: harness documentation, CI-gate description, pin-update procedure.
+- npm scripts: `c-rec:verify` runs the KAT + contract gates via tsx; `c-rec:table` prints the side-by-side to stdout; `c-rec:report` regenerates the payload; `c-rec:report:check` verifies committed payload is byte-identical to a fresh regen.
+- CI: the `vectors:` job in `.github/workflows/ci.yml` runs `c-rec:verify` and `c-rec:report:check` on every push. Merges fail on drift.
+
+### Rationale
+
+- Uses GIF verbatim rather than reimplementing. Vendoring cleanly satisfies Apache-2.0 §4 attribution (SPDX + copyright + NOTICE all preserved and reproduced) without derivative-work reasoning. The comparison in every payload row is between GIF's actual bytes and this repo's actual bytes; no translation layer sits between the two.
+
 ## [0.7.1] - 2026-08-25
 
 ### Added

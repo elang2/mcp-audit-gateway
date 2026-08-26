@@ -35,3 +35,5 @@ jobs:
       - run: node test/vectors/verify-checkpoint.mjs
       - run: python3 test/vectors/verify-checkpoint.py
       - run: node test/vectors/aps-action-ref-v1.mjs
+      - run: npm run c-rec:verify
+      - run: npm run c-rec:report:check

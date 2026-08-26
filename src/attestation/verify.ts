@@ -171,7 +171,11 @@ export async function verifyChainLines(lines: string[]): Promise<ChainVerifyResu
  * Verify chain continuity from pre-parsed records.
  * Uses JSON.stringify re-serialization — correct only when insertion-order
  * is preserved (guaranteed in V8/Node.js for integer-free keys).
- * Prefer verifyChainLines() when raw JSONL lines are available.
+ *
+ * Prefer {@link verifyChainLines} (since 0.7.1) when raw JSONL lines are
+ * available. Retained for callers that only have pre-parsed records
+ * (e.g. records received as JSON objects over a queue or reconstructed
+ * from another storage format rather than raw JSONL lines).
  */
 export async function verifyChain(records: ChainRecord[]): Promise<ChainVerifyResult> {
   const result: ChainVerifyResult = { total: records.length, valid: true, errors: [] };

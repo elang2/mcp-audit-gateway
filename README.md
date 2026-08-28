@@ -153,7 +153,7 @@ npx @mcp-audit-gateway/core wrap -- <your mcp server command>
 
 ## Attestation layer
 
-The signing and verification subsystem goes beyond per-record HMAC. It provides tamper-evidence across log rotation, crash recovery, and multi-file chains.
+The signing and verification subsystem goes beyond per-record HMAC. Gateway mode signs each record with Ed25519 (asymmetric, verifiable with a public key) by default; HMAC-SHA256 is available for symmetric-secret deployments. Wrap mode uses HMAC-SHA256 with a per-user key auto-generated on first run. Records are hash-chained across log rotation, crash recovery, and multi-file chains.
 
 Checkpoint records let a consumer detect tail truncation by stashing a single hash externally. The chain carries forward across file rotations (no silent resets). Forced restarts emit signed `chain_break` records instead of quietly starting fresh.
 

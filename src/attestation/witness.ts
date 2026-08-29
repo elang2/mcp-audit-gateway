@@ -1,5 +1,5 @@
 // Witness projection: deterministic role/party-scoped projection of an
-// AuditRecord. Companion to the parties[] attribution shipped in v0.2.0.
+// AuditRecord. Companion to the parties[] attribution on AuditRecord.
 //
 // Motivation: audit records carry multi-party attribution in `parties[]`
 // (each entry has a role, party, and scope). Consumers that aggregate over
@@ -15,18 +15,19 @@
 // canonical hash is domain-tagged so it cannot collide with a record hash
 // by construction.
 //
-// Referenced discussions on the read-side reduction problem:
-//   - modelcontextprotocol/modelcontextprotocol#2817 (SEP-2817): parties[]
-//     attribution integrated into the SEP text; XuebinMa's Aug-24 comment
-//     (issuecomment-5390870362) describes agent-guard's ExecutionFinished
-//     vs ExecutionReported split after their consumer collapsed the
-//     record-level distinction under a counter.
-//   - This repo's write-side regression tests at commit a87b09b assert
-//     scope arrays don't overlap and no cross-scope leakage on ingest;
+// Prior art on the read-side reduction problem:
+//   - MCP SEP work on the parties/witness distinction identifies the
+//     same failure mode from external runtimes: a type-level split
+//     between "execution finished" (witnessed) and "execution reported"
+//     (asserted) emerges after a consumer collapses the record-level
+//     distinction under a counter.
+//   - This repo's write-side regression tests assert that scope arrays
+//     don't overlap and no cross-scope leakage occurs on ingest;
 //     projectByRole is the read-side primitive that consumers call to
 //     preserve those boundaries under aggregation.
-//   - CycloneDX/specification#1016 (@Silentpartnercoding): party-level
-//     field attribution via native CycloneDX citation constructs.
+//   - A separate SBOM-format proposal describes party-level field
+//     attribution via native citation constructs; projectByRole is the
+//     verifier-side projection primitive that shape implies.
 
 import { createHash } from "node:crypto";
 import type { AuditRecord, PartyAttribution } from "../types.js";
@@ -41,8 +42,8 @@ export interface WitnessProjection {
   /** Discriminant. Never matches any AuditRecord field. */
   type: "witness-projection";
   /** SHA-256 of the source record via `hashRecord` (raw `JSON.stringify`
-   * + sha256, matching how the chain hashes records since v0.7.0's
-   * octets-first change). Pointer back to the source. `projectionDigest`
+   * + sha256, matching the chain's octets-first hashing of records).
+   * Pointer back to the source. `projectionDigest`
    * below uses `canonicalizeValue` on the projection body itself; the
    * two hash outputs use different canonicalization disciplines
    * intentionally, so `projectionOf` matches chain lookups and

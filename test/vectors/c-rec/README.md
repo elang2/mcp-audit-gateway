@@ -6,7 +6,7 @@ Shows byte-level divergence between two canonicalization approaches on
 the same inputs.
 
 - **GIF sorted-JSON**: from [notboatanchor/gif](https://github.com/notboatanchor/gif/tree/e1f02a95506e81e7766c3ba3a684ecad7cfff12f) @ `e1f02a95506e81e7766c3ba3a684ecad7cfff12f`, the SEP-3004 author's reference implementation. Used VERBATIM in this repo at `./vendored/gif/audit-record-contract.ts`, Apache-2.0 licensed. See `./SOURCE.md` for provenance and license terms.
-- **mcp-audit-gateway type-tagged M/L**: the algorithm shipped in v0.7.1 and later at `src/attestation/signer.ts`. Original work, MIT licensed per the repository root LICENSE.
+- **mcp-audit-gateway type-tagged M/L**: the algorithm at `src/attestation/signer.ts`. Original work, MIT licensed per the repository root LICENSE.
 
 ## Files
 

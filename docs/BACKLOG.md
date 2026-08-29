@@ -1,6 +1,6 @@
-# v0.3.x Backlog (Deferred, Non-Blocking)
+# Backlog (Deferred, Non-Blocking)
 
-Items explicitly deferred during Rounds 1-6 review. None block the v0.3.0 tag. All should become issues before fixture work begins.
+Items explicitly deferred during Rounds 1-6 review. None are release-blocking. All should become issues before fixture work begins.
 
 ## Executable verification-mode vectors
 

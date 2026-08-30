@@ -10,6 +10,8 @@ Your AI agent made 847 tool calls yesterday. Can you verify what it did?
 
 Tamper-evident audit trail for AI agent tool calls.
 
+> **Not to be confused with** [`amin-ale/mcp-audit-gateway`](https://github.com/amin-ale/mcp-audit-gateway), an unrelated Python project with the same name.
+
 ## Setup (10 seconds)
 
 Before:

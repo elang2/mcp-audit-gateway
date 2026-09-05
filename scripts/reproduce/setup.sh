@@ -390,7 +390,26 @@ install_ruby() {
 install_java() {
   step "OpenJDK ${JAVA_MAJOR} + vendored jars"
   apt_install "openjdk-${JAVA_MAJOR}-jdk-headless"
-  java -version 2>&1 | grep -qE "\"${JAVA_MAJOR}\." || fail "Java ${JAVA_MAJOR} not active"
+  # GitHub Actions runners ship multiple JDKs pre-installed with lower-numbered
+  # versions ahead of newer ones on PATH. Explicitly select the JDK we just
+  # apt-installed by setting JAVA_HOME + prepending its bin/ before the check.
+  local java_home
+  java_home="$(dirname "$(dirname "$(readlink -f "$(command -v update-alternatives)")")")"
+  # Prefer the canonical apt install path
+  if [[ -x "/usr/lib/jvm/java-${JAVA_MAJOR}-openjdk-amd64/bin/java" ]]; then
+    export JAVA_HOME="/usr/lib/jvm/java-${JAVA_MAJOR}-openjdk-amd64"
+  elif [[ -x "/usr/lib/jvm/temurin-${JAVA_MAJOR}-jdk-amd64/bin/java" ]]; then
+    export JAVA_HOME="/usr/lib/jvm/temurin-${JAVA_MAJOR}-jdk-amd64"
+  else
+    JAVA_HOME="$(find /usr/lib/jvm -maxdepth 2 -type d -name "*${JAVA_MAJOR}*openjdk*" | head -n1)"
+    [[ -n "${JAVA_HOME}" && -x "${JAVA_HOME}/bin/java" ]] || fail "cannot locate installed JDK ${JAVA_MAJOR}"
+    export JAVA_HOME
+  fi
+  export PATH="${JAVA_HOME}/bin:${PATH}"
+  # Also register with update-alternatives so subsequent shells see it too
+  ${SUDO} update-alternatives --set java "${JAVA_HOME}/bin/java" 2>/dev/null || true
+  ${SUDO} update-alternatives --set javac "${JAVA_HOME}/bin/javac" 2>/dev/null || true
+  java -version 2>&1 | grep -qE "\"${JAVA_MAJOR}(\.|\+)" || fail "Java ${JAVA_MAJOR} not active (java -version: $(java -version 2>&1 | head -n1))"
   ${SUDO} mkdir -p "${JACKSON_DIR}" "${JSON_CANON_JAR_DIR}"
   local jackson_base="https://repo1.maven.org/maven2/com/fasterxml/jackson"
   local jars=(

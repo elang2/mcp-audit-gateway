@@ -43,6 +43,19 @@ export RUSTUP_HOME="${RUSTUP_HOME:-${HOME}/.rustup}"
 export RBENV_ROOT="${RBENV_ROOT:-${HOME}/.rbenv}"
 export CROSS_EMITTER_VENDOR="${CROSS_EMITTER_VENDOR:-/opt/cross-emitter-vendor}"
 
+# JAVA_HOME: GitHub Actions Ubuntu runners ship multiple JDKs pre-installed with
+# lower-numbered versions ahead of newer ones on PATH. Pin JAVA_HOME to the
+# openjdk-21 install path that setup.sh apt-installs, and prepend its bin to
+# PATH so `java -version` reports 21 across all subshells. Overridable by any
+# caller who has already set JAVA_HOME.
+if [[ -z "${JAVA_HOME:-}" ]]; then
+  if [[ -x "/usr/lib/jvm/java-21-openjdk-amd64/bin/java" ]]; then
+    export JAVA_HOME="/usr/lib/jvm/java-21-openjdk-amd64"
+  elif [[ -x "/usr/lib/jvm/temurin-21-jdk-amd64/bin/java" ]]; then
+    export JAVA_HOME="/usr/lib/jvm/temurin-21-jdk-amd64"
+  fi
+fi
+
 # PATH: prepend every SDK's bin dir onto whatever PATH the caller already
 # has. Preserving the caller's PATH is critical — without /usr/bin and /bin
 # on PATH, even `mktemp`, `cat`, and `rm` disappear and the smoke harness
@@ -53,6 +66,9 @@ _SDK_PATH="${GOROOT}/bin:${GOPATH}/bin:${KOTLIN_HOME}/bin:${SWIFT_HOME}/usr/bin"
 _SDK_PATH="${_SDK_PATH}:${DOTNET_ROOT}:${CARGO_HOME}/bin"
 _SDK_PATH="${_SDK_PATH}:${RBENV_ROOT}/bin:${RBENV_ROOT}/shims"
 _SDK_PATH="${_SDK_PATH}:${HOME}/.config/composer/vendor/bin"
+if [[ -n "${JAVA_HOME:-}" && -x "${JAVA_HOME}/bin/java" ]]; then
+  _SDK_PATH="${JAVA_HOME}/bin:${_SDK_PATH}"
+fi
 export PATH="${_SDK_PATH}:${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
 unset _SDK_PATH
 

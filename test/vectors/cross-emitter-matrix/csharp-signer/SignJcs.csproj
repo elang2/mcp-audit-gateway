@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <RootNamespace>McpMatrix</RootNamespace>
+    <AssemblyName>SignJcs</AssemblyName>
+    <StartupObject>McpMatrix.SignJcsProgram</StartupObject>
+    <!-- Exclude the sibling Sign.cs (built by Sign.csproj) so this project
+         only compiles SignJcs.cs. -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="SignJcs.cs" />
+    <!-- cyberphone JCS reference impl for .NET (RFC 8785). -->
+    <PackageReference Include="jsoncanonicalizer" Version="1.0.0" />
+    <!-- Ed25519. -->
+    <PackageReference Include="NSec.Cryptography" Version="24.4.0" />
+  </ItemGroup>
+</Project>

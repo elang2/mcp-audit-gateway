@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <RootNamespace>McpMatrix</RootNamespace>
+    <AssemblyName>Sign</AssemblyName>
+    <!-- Exclude the sibling SignJcs.cs (built by SignJcs.csproj) so this
+         project only compiles Sign.cs. -->
+    <DefaultItemExcludes>SignJcs.cs;$(DefaultItemExcludes)</DefaultItemExcludes>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NSec.Cryptography" Version="24.4.0" />
+  </ItemGroup>
+</Project>

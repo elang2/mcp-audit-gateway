@@ -1,0 +1,342 @@
+# syntax=docker/dockerfile:1.7
+#
+# Dockerfile.replication — cross-emitter signature-verification matrix
+# ---------------------------------------------------------------------------
+# Produces a single container image with all 10 official MCP SDK toolchains
+# at pinned versions. One `docker build` step yields an image capable of
+# running the smoke test end-to-end:
+#
+#     docker build -t mcp-emitter-matrix:2026-09-01 \
+#                  -f docker/Dockerfile.replication .
+#     docker run --rm mcp-emitter-matrix:2026-09-01 smoke
+#
+# The image is layered so each language toolchain lives in its own build
+# stage. The final stage COPY --from=<stage> pulls only the built binaries
+# and runtime shared objects each SDK needs. Layer order is roughly
+# stable→volatile: base OS libs → JVM → Node → Python → Go → Rust → Ruby
+# → .NET → PHP → Kotlin → Swift → source tree + composer/gem/nuget install.
+#
+# NOTE on Swift: swift-corelibs-foundation on Linux differs from Apple's
+# Foundation on Darwin. The smoke test's SDK-lane inventory filters Swift
+# to darwin only (see SDK_LANES.sw.extraNeeds in
+# test/vectors/smoke/smoke-conformance.mjs). Inside this Linux container
+# the Swift toolchain is INSTALLED but the smoke test SKIPS the Swift lane
+# unless the file's platform guard is patched or removed. See
+# docker/replication.md for the recipe.
+# ---------------------------------------------------------------------------
+
+# =============================================================================
+# STAGE: base
+# Ubuntu 22.04 LTS with the shared toolchain-building prerequisites every
+# subsequent stage needs. Everything after this stage inherits FROM base.
+# =============================================================================
+FROM ubuntu:22.04 AS base
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    TZ=UTC
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl wget gnupg lsb-release software-properties-common \
+        build-essential pkg-config git unzip xz-utils zip \
+        libssl-dev libreadline-dev zlib1g-dev libyaml-dev libffi-dev \
+        libgmp-dev libncurses5-dev libsqlite3-dev libbz2-dev \
+        libcurl4-openssl-dev libedit-dev libxml2-dev libzip-dev \
+        libonig-dev libsodium-dev \
+        jq \
+     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# =============================================================================
+# STAGE: node
+# Node.js 22.x LTS via NodeSource. Used by the TypeScript SDK lane and the
+# smoke test driver itself.
+# =============================================================================
+FROM base AS node
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    node --version && npm --version
+
+# =============================================================================
+# STAGE: python
+# Python 3.11 (system default on Ubuntu 22.04 is 3.10, so pull via
+# deadsnakes). rfc8785==0.1.4 pinned for the JCS Python lane.
+# =============================================================================
+FROM base AS python
+RUN add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt-get update && apt-get install -y --no-install-recommends \
+        python3.11 python3.11-venv python3.11-dev python3-pip && \
+    ln -sf /usr/bin/python3.11 /usr/local/bin/python3 && \
+    ln -sf /usr/bin/python3.11 /usr/local/bin/python && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN python3 -m pip install --no-cache-dir --upgrade pip==24.2 && \
+    python3 -m pip install --no-cache-dir \
+        rfc8785==0.1.4 \
+        cryptography==43.0.1 \
+        pynacl==1.5.0
+
+# =============================================================================
+# STAGE: go
+# Go 1.24.7 from the official tarball. Placed under /usr/local/go so
+# `go` is on the PATH via /usr/local/go/bin. amd64 tarball; a companion
+# arm64 arg is left available for cross-arch builds.
+# =============================================================================
+FROM base AS go
+ARG GO_VERSION=1.24.7
+ARG GO_ARCH=amd64
+RUN wget -q https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz -O /tmp/go.tgz && \
+    tar -C /usr/local -xzf /tmp/go.tgz && \
+    rm /tmp/go.tgz
+ENV PATH=/usr/local/go/bin:${PATH} \
+    GOPATH=/root/go
+RUN go version
+
+# =============================================================================
+# STAGE: ruby
+# Ruby 3.3.8 built from source. Ubuntu 22.04 ships 3.0 and the JCS lane
+# needs 3.3+ semantics (Data.define, refined Integer#to_s). We compile
+# straight into /usr/local so the final image can COPY it directly.
+# json-canonicalization 1.0.0 and ed25519 1.3.0 pinned via bundler-less
+# gem install.
+# =============================================================================
+FROM base AS ruby
+ARG RUBY_VERSION=3.3.8
+RUN wget -q "https://cache.ruby-lang.org/pub/ruby/3.3/ruby-${RUBY_VERSION}.tar.gz" -O /tmp/ruby.tgz && \
+    mkdir -p /tmp/ruby && tar -xzf /tmp/ruby.tgz -C /tmp/ruby --strip-components=1 && \
+    cd /tmp/ruby && ./configure --prefix=/usr/local --disable-install-doc --enable-shared && \
+    make -j"$(nproc)" && make install && \
+    rm -rf /tmp/ruby /tmp/ruby.tgz
+RUN /usr/local/bin/gem install --no-document \
+        ed25519:1.3.0 \
+        json-canonicalization:1.0.0
+
+# =============================================================================
+# STAGE: jdk
+# OpenJDK 21 via apt (the temurin-flavored eclipse-adoptium alternative is
+# also available; we use the Ubuntu-supplied openjdk-21 for a smaller
+# dependency footprint). Jackson 2.16.0 jars and
+# java-json-canonicalization 1.1 come from the repo working tree at
+# test/vectors/runners/*.jar (pre-vendored, SHA-256 pinned — see
+# docker/replication.md). We do NOT re-fetch from Maven Central at build
+# time so an air-gapped build works if the source tree is present.
+# =============================================================================
+FROM base AS jdk
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        openjdk-21-jdk && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    java --version && javac --version
+
+# =============================================================================
+# STAGE: kotlin
+# Kotlin 2.0.21 via the Kotlin GitHub Release tarball. SDKMAN pulls too
+# much shell state and is awkward in a Docker layer; we drop the compiler
+# into /opt/kotlinc and put its bin on PATH.
+# =============================================================================
+FROM base AS kotlin
+ARG KOTLIN_VERSION=2.0.21
+RUN apt-get update && apt-get install -y --no-install-recommends openjdk-17-jre-headless && rm -rf /var/lib/apt/lists/*
+RUN wget -q "https://github.com/JetBrains/kotlin/releases/download/v${KOTLIN_VERSION}/kotlin-compiler-${KOTLIN_VERSION}.zip" -O /tmp/kotlin.zip && \
+    unzip -q /tmp/kotlin.zip -d /opt && \
+    rm /tmp/kotlin.zip
+ENV PATH=/opt/kotlinc/bin:${PATH}
+RUN kotlinc -version 2>&1
+
+# =============================================================================
+# STAGE: dotnet
+# .NET SDK 9.0 via the Microsoft package repo. NSec.Cryptography and
+# jsoncanonicalizer NuGet packages are restored during the source-build
+# step in the final stage (needs the csproj files to be present).
+# =============================================================================
+FROM base AS dotnet
+RUN wget -q https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -O /tmp/msprod.deb && \
+    dpkg -i /tmp/msprod.deb && rm /tmp/msprod.deb && \
+    apt-get update && apt-get install -y --no-install-recommends \
+        dotnet-sdk-9.0 && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    dotnet --info | head -20
+
+# =============================================================================
+# STAGE: rust
+# Rust 1.98.0 via rustup with the minimal profile. Cargo.lock inside the
+# repo is what pins ed25519-dalek, serde_jcs, serde_json_canonicalizer,
+# regex, once_cell versions.
+# =============================================================================
+FROM base AS rust
+ARG RUST_VERSION=1.98.0
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+      | sh -s -- -y --default-toolchain "${RUST_VERSION}" --profile minimal
+ENV PATH=/root/.cargo/bin:${PATH}
+RUN rustc --version && cargo --version
+
+# =============================================================================
+# STAGE: php
+# PHP 8.3 via ondrej/php PPA (Ubuntu 22.04's stock 8.1 works too; 8.3 is
+# the version the JCS lane was primarily tested against). Composer
+# fetched by the official installer. root23/php-json-canonicalization
+# 1.0.1 installed globally via composer so `require` works from any dir.
+# =============================================================================
+FROM base AS php
+RUN add-apt-repository -y ppa:ondrej/php && \
+    apt-get update && \
+    apt-get update && apt-get install -y --no-install-recommends \
+        php8.3 php8.3-cli php8.3-common php8.3-mbstring php8.3-xml \
+        php8.3-curl php8.3-bcmath php8.3-gmp && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    php --version && \
+    if ! php -m | grep -qi sodium; then \
+      echo "sodium extension missing from php8.3 base package; add php-sodium" >&2; \
+      exit 1; \
+    fi
+RUN curl -fsSL https://getcomposer.org/installer -o /tmp/composer-setup.php && \
+    php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer && \
+    rm /tmp/composer-setup.php && \
+    composer --version
+RUN mkdir -p /opt/php-deps && cd /opt/php-deps && \
+    composer require --no-interaction --no-progress \
+        root23/php-json-canonicalization:1.0.1
+
+# =============================================================================
+# STAGE: swift
+# Swift 5.10.1 via the swift.org Ubuntu 22.04 tarball. Linked to /opt/swift.
+# Only tuple-array signer/verifier are exercised by default; the smoke
+# test filters Swift out on non-darwin by design (see file header for
+# the patch recipe).
+# =============================================================================
+FROM base AS swift
+ARG SWIFT_VERSION=5.10.1
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        binutils libc6-dev libcurl4-openssl-dev libedit2 libgcc-11-dev \
+        libpython3-dev libsqlite3-0 libstdc++-11-dev libxml2-dev \
+        libz3-dev pkg-config tzdata uuid-dev && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN wget -q "https://download.swift.org/swift-${SWIFT_VERSION}-release/ubuntu2204/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE-ubuntu22.04.tar.gz" -O /tmp/swift.tgz && \
+    mkdir -p /opt/swift && \
+    tar -xzf /tmp/swift.tgz -C /opt/swift --strip-components=1 && \
+    rm /tmp/swift.tgz
+ENV PATH=/opt/swift/usr/bin:${PATH}
+RUN swift --version
+
+# =============================================================================
+# STAGE: build
+# Merges every toolchain into a single image, copies the mcp-audit-gateway
+# source tree in, then builds the artifacts each language lane requires
+# for the smoke test (Rust binaries, C# DLLs, compiled Java classes, npm
+# install for the harness). Everything happens once here so `docker run`
+# is startup-cost only.
+# =============================================================================
+FROM base AS build
+
+# --- copy toolchains from their stages --------------------------------------
+# Node
+COPY --from=node /usr/bin/node /usr/bin/node
+COPY --from=node /usr/lib/node_modules /usr/lib/node_modules
+COPY --from=node /usr/bin/npm /usr/bin/npm
+COPY --from=node /usr/bin/npx /usr/bin/npx
+# Python
+COPY --from=python /usr/bin/python3.11 /usr/bin/python3.11
+COPY --from=python /usr/lib/python3.11 /usr/lib/python3.11
+COPY --from=python /usr/local/lib/python3.11 /usr/local/lib/python3.11
+COPY --from=python /usr/local/bin/python3 /usr/local/bin/python3
+COPY --from=python /usr/local/bin/python /usr/local/bin/python
+COPY --from=python /usr/local/bin/pip3 /usr/local/bin/pip3
+# Deadsnakes-supplied 3.11 pulls a couple of extra shared object files;
+# the safe path is a full apt-install of python3.11 in this stage so the
+# runtime linker resolves libpython3.11.so.1.0 correctly.
+RUN add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt-get update && apt-get install -y --no-install-recommends \
+        python3.11 python3.11-venv python3-pip && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    python3 -m pip install --no-cache-dir rfc8785==0.1.4
+# Go
+COPY --from=go /usr/local/go /usr/local/go
+ENV PATH=/usr/local/go/bin:/root/.cargo/bin:/opt/kotlinc/bin:/opt/swift/usr/bin:/root/.dotnet:${PATH}
+# Ruby (installed to /usr/local by the ruby stage)
+COPY --from=ruby /usr/local /opt/ruby-stage
+RUN cp -a /opt/ruby-stage/. /usr/local/ && rm -rf /opt/ruby-stage
+# JDK 21
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        openjdk-21-jre-headless openjdk-21-jdk-headless && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+# Kotlin compiler
+COPY --from=kotlin /opt/kotlinc /opt/kotlinc
+# .NET SDK 9.0
+COPY --from=dotnet /usr/share/dotnet /usr/share/dotnet
+RUN ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
+# Also expose the ~/.dotnet path the smoke test looks for
+RUN mkdir -p /root/.dotnet && ln -sf /usr/share/dotnet/dotnet /root/.dotnet/dotnet
+# Rust
+COPY --from=rust /root/.rustup /root/.rustup
+COPY --from=rust /root/.cargo /root/.cargo
+# PHP + composer + composer deps
+RUN add-apt-repository -y ppa:ondrej/php && \
+    apt-get update && \
+    apt-get update && apt-get install -y --no-install-recommends \
+        php8.3-cli php8.3-common php8.3-mbstring php8.3-xml php8.3-curl \
+        php8.3-bcmath php8.3-gmp && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    if ! php -m | grep -qi sodium; then \
+      echo "sodium extension missing from php8.3 base package; add php-sodium" >&2; \
+      exit 1; \
+    fi
+COPY --from=php /usr/local/bin/composer /usr/local/bin/composer
+COPY --from=php /opt/php-deps /opt/php-deps
+ENV COMPOSER_ALLOW_SUPERUSER=1 \
+    COMPOSER_HOME=/opt/composer-cache
+# Swift
+COPY --from=swift /opt/swift /opt/swift
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libedit2 libxml2 libncurses5 libpython3-dev && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# --- copy source tree -------------------------------------------------------
+WORKDIR /work
+COPY . /work
+
+# --- npm install (harness deps only, no dev noise) --------------------------
+RUN cd /work && npm ci --omit=dev --no-audit --no-fund || npm install --no-audit --no-fund
+
+# --- build Rust binaries (release profile) ----------------------------------
+RUN cd /work/test/vectors/cross-emitter-matrix/rust-signer && \
+    cargo build --release --locked
+
+# --- compile C# projects (Sign, SignJcs, Verify) ----------------------------
+RUN cd /work/test/vectors/cross-emitter-matrix/csharp-signer && \
+    dotnet build -c Release Sign.csproj && \
+    dotnet build -c Release SignJcs.csproj
+RUN cd /work/test/vectors/cross-emitter-matrix/csharp-verifier && \
+    dotnet build -c Release Verify.csproj
+
+# --- compile Java sources against pre-vendored Jackson jars -----------------
+RUN cd /work/test/vectors/cross-emitter-matrix && \
+    javac -cp "../runners/jackson-core.jar:../runners/jackson-databind.jar:../runners/jackson-annotations.jar:../runners/java-json-canonicalization-1.1.jar:." \
+          Sign.java Verify.java SignJcs.java
+
+# --- prebuild Go binaries so runtime spawns don't recompile -----------------
+RUN cd /work/test/vectors/cross-emitter-matrix && \
+    go build -o /usr/local/bin/mcp-sign-go sign.go && \
+    go build -o /usr/local/bin/mcp-verify-go verify.go && \
+    go build -o /usr/local/bin/mcp-sign-jcs-go sign-jcs.go
+
+# --- point Ruby's LOAD_PATH at the correct gem dir --------------------------
+# The sign.rb / verify.rb files hard-code $LOAD_PATH.unshift for a Ruby-2.6
+# gem path from a developer machine. We add the real gem path as a fallback
+# via RUBYLIB so `require 'ed25519'` / `require 'json/canonicalization'`
+# resolve inside the container.
+ENV RUBYLIB=/usr/local/lib/ruby/gems/3.3.0/gems/ed25519-1.3.0/lib:/usr/local/lib/ruby/gems/3.3.0/gems/json-canonicalization-1.0.0/lib
+
+# --- entrypoint script ------------------------------------------------------
+COPY docker/replication-entrypoint.sh /usr/local/bin/replication-entrypoint.sh
+RUN chmod +x /usr/local/bin/replication-entrypoint.sh
+
+# ---------------------------------------------------------------------------
+# Runtime configuration
+# ---------------------------------------------------------------------------
+ENV SIGNING_KEY_HEX=0000000000000000000000000000000000000000000000000000000000000042 \
+    NODE_OPTIONS=--no-deprecation
+
+WORKDIR /work
+VOLUME ["/work/out"]
+
+ENTRYPOINT ["/usr/local/bin/replication-entrypoint.sh"]
+CMD ["smoke"]

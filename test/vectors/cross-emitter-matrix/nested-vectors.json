@@ -1,0 +1,108 @@
+{
+  "format_version": "1.0",
+  "description": "Nested-field test vectors for the cross-emitter matrix. Exercises the canonicalize_value recursion (aiInvocation, parties, extensionsDigest as JSON objects/arrays with unicode keys, integer values, and nested structures). Complements the flat vectors in ../canonicalization.json.",
+  "vectors": [
+    {
+      "name": "nested_aiInvocation_object",
+      "record": {
+        "id": "aaaaaaaa-0000-0000-0000-000000000001",
+        "timestamp": "2026-08-30T00:00:00.000Z",
+        "method": "tools/call",
+        "toolName": "search",
+        "namespace": "web",
+        "upstream": "search-server",
+        "principal": "user:bob@example.com",
+        "durationMs": 234,
+        "success": true,
+        "previousHash": "genesis",
+        "aiInvocation": {
+          "model": "claude-sonnet-4-5",
+          "temperature": 0,
+          "tokensIn": 1024,
+          "tokensOut": 512
+        }
+      }
+    },
+    {
+      "name": "nested_parties_array",
+      "record": {
+        "id": "aaaaaaaa-0000-0000-0000-000000000002",
+        "timestamp": "2026-08-30T00:00:01.000Z",
+        "method": "tools/call",
+        "toolName": "call_agent",
+        "namespace": "agents",
+        "upstream": "agent-server",
+        "principal": "user:carol@example.com",
+        "durationMs": 456,
+        "success": true,
+        "previousHash": "genesis",
+        "parties": [
+          {"role": "caller", "id": "user:carol"},
+          {"role": "callee", "id": "agent:planner"},
+          {"role": "witness", "id": "gateway:audit"}
+        ]
+      }
+    },
+    {
+      "name": "nested_extensionsDigest_string",
+      "record": {
+        "id": "aaaaaaaa-0000-0000-0000-000000000003",
+        "timestamp": "2026-08-30T00:00:02.000Z",
+        "method": "tools/call",
+        "toolName": "annotate",
+        "namespace": "internal",
+        "upstream": "annotate-server",
+        "principal": "user:dan@example.com",
+        "durationMs": 88,
+        "success": true,
+        "previousHash": "genesis",
+        "extensionsDigest": "sha256:abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab"
+      }
+    },
+    {
+      "name": "nested_all_optional_fields",
+      "record": {
+        "id": "aaaaaaaa-0000-0000-0000-000000000004",
+        "timestamp": "2026-08-30T00:00:03.000Z",
+        "method": "tools/call",
+        "toolName": "compose",
+        "namespace": "workflow",
+        "upstream": "workflow-server",
+        "principal": "user:eve@example.com",
+        "durationMs": 987,
+        "success": true,
+        "previousHash": "genesis",
+        "decisionContextDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "extensionsDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "aiInvocation": {
+          "model": "gpt-4o",
+          "systemPrompt": "you are helpful",
+          "toolChoice": "auto"
+        },
+        "parties": [
+          {"role": "orchestrator", "id": "agent:conductor"}
+        ]
+      }
+    },
+    {
+      "name": "nested_unicode_keys_and_values",
+      "record": {
+        "id": "aaaaaaaa-0000-0000-0000-000000000005",
+        "timestamp": "2026-08-30T00:00:04.000Z",
+        "method": "tools/call",
+        "toolName": "translate",
+        "namespace": "i18n",
+        "upstream": "translate-server",
+        "principal": "user:франсуа@example.com",
+        "durationMs": 321,
+        "success": true,
+        "previousHash": "genesis",
+        "aiInvocation": {
+          "модель": "gpt-4o",
+          "언어": "한국어",
+          "🔧toolChoice": "auto"
+        }
+      }
+    }
+  ]
+}

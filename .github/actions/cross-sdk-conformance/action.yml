@@ -1,0 +1,98 @@
+name: 'MCP Cross-SDK Conformance'
+description: >-
+  Run wire-level conformance tests against a Model Context Protocol SDK.
+  Verifies canonical JSON output matches the reference test vectors so that
+  records emitted by this SDK can be byte-verified by any other conforming
+  SDK. Fails CI on divergences.
+author: 'Elankumaran Srinivasan'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  sdk:
+    description: >-
+      SDK under test. One of: typescript, python, go, swift, java, kotlin,
+      csharp, php, ruby, rust. The action expects the SDK's canonical
+      serializer to be available on PATH under the standard runner name
+      (see mcp-audit-gateway/test/vectors/runners/README.md).
+    required: true
+  fail-on-divergence:
+    description: >-
+      Whether CI should fail on any divergence from the reference test vectors.
+      Set to "warn" to emit warnings without failing (default is "fail").
+    required: false
+    default: 'fail'
+  layer:
+    description: >-
+      Which layer to check. "sdk" runs SDK-wire tests only; "stdlib" runs
+      language JSON stdlib tests only; "all" runs both. Default is "all".
+    required: false
+    default: 'all'
+  vectors-ref:
+    description: >-
+      Git ref of elang2/mcp-audit-gateway to pull vectors from. Pin to a
+      release tag for reproducible CI. Default is the latest v0.7.x tag.
+    required: false
+    default: 'v0.7.8'
+
+outputs:
+  divergence-count:
+    description: 'Number of test cases where this SDK diverged from the reference'
+    value: ${{ steps.run.outputs.divergence-count }}
+  agreement-rate:
+    description: 'Fraction of test cases where this SDK matched the reference (0.0 - 1.0)'
+    value: ${{ steps.run.outputs.agreement-rate }}
+  results-json:
+    description: 'Path to the results JSON file'
+    value: ${{ steps.run.outputs.results-json }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check out mcp-audit-gateway vectors
+      uses: actions/checkout@v4
+      with:
+        repository: elang2/mcp-audit-gateway
+        ref: ${{ inputs.vectors-ref }}
+        path: mcp-audit-gateway-vectors
+
+    - name: Run cross-SDK conformance
+      id: run
+      shell: bash
+      run: |
+        cd mcp-audit-gateway-vectors
+        LAYER_FLAG=""
+        if [ "${{ inputs.layer }}" = "sdk" ]; then LAYER_FLAG="--layer sdk"; fi
+        if [ "${{ inputs.layer }}" = "stdlib" ]; then LAYER_FLAG="--layer stdlib"; fi
+        ./test/vectors/cross-sdk-diff.sh $LAYER_FLAG --json --sdk-filter "${{ inputs.sdk }}" > results.json
+        DIVERGENCE=$(jq '.divergence_count // 0' results.json)
+        TOTAL=$(jq '.total_tests // 40' results.json)
+        AGREEMENT=$(awk "BEGIN { printf \"%.3f\", 1.0 - ($DIVERGENCE / $TOTAL) }")
+        echo "divergence-count=$DIVERGENCE" >> "$GITHUB_OUTPUT"
+        echo "agreement-rate=$AGREEMENT" >> "$GITHUB_OUTPUT"
+        echo "results-json=mcp-audit-gateway-vectors/results.json" >> "$GITHUB_OUTPUT"
+        echo ""
+        echo "=========================================="
+        echo "MCP Cross-SDK Conformance Result"
+        echo "=========================================="
+        echo "SDK under test:    ${{ inputs.sdk }}"
+        echo "Divergences:       $DIVERGENCE of $TOTAL tests"
+        echo "Agreement rate:    $AGREEMENT"
+        echo "=========================================="
+        if [ "$DIVERGENCE" -gt 0 ] && [ "${{ inputs.fail-on-divergence }}" = "fail" ]; then
+          echo "::error::SDK ${{ inputs.sdk }} diverged on $DIVERGENCE of $TOTAL tests. See results.json for details."
+          jq -r '.divergent_tests[]? | "  DIVERGENT: \(.name)"' results.json
+          exit 1
+        elif [ "$DIVERGENCE" -gt 0 ]; then
+          echo "::warning::SDK ${{ inputs.sdk }} diverged on $DIVERGENCE of $TOTAL tests. See results.json for details."
+        else
+          echo "All $TOTAL conformance tests passed."
+        fi
+
+    - name: Upload results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: mcp-cross-sdk-conformance-${{ inputs.sdk }}
+        path: mcp-audit-gateway-vectors/results.json

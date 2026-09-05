@@ -1,0 +1,675 @@
+{
+  "format_version": "1.0",
+  "description": "Adversarial cross-emitter matrix vectors targeting 10 Wycheproof-style categories (unicode-normalization, lone-surrogate, deep-nesting, integer-edge, empty-structure, mixed-type-array, sort-collision, zwj-rtl, escaped-control, boolean-integer-overlap). 26 vectors total, ids adv-01..adv-25 plus adv-ruby-lone-trailing. Same tuple-array record shape as canonicalization.json.",
+  "rationale": "Corpus targets the 10 requested Wycheproof-style categories with 2-3 vectors each (25 base vectors, ids adv-01..adv-25) grounded in the tuple-array record shape from the existing canonicalization.json. Category coverage is skewed toward the fault modes with the highest cross-SDK divergence risk given prior findings: integer-edge gets 4 vectors (max-safe, min-safe, +1 past each) to isolate double-precision cutoffs from bignum SDKs, sort-collision uses supplementary vs. PUA and emoji vs. PUA key pairs to distinguish UTF-16-code-unit sorting from code-point sorting (the categorical failure mode most likely to break Swift/Python/Go/Rust at once), and lone-surrogate includes high-alone, low-alone, and reversed-pair variants because SDKs diverge on WHICH surrogate patterns their JSON encoder catches. Vector adv-ruby-lone-trailing (26th vector, category lone-surrogate) is the labeled version of a Ruby-json 2.7.2 finding: a lone trailing low surrogate \\uDE04 in a string body is silently accepted by Ruby's stdlib JSON.parse and stored as a 3-byte CESU-8/WTF-8 sequence rather than being rejected as unpaired UTF-16. Every other SDK in the matrix (JS, Python, Go, Java, Kotlin, Swift, PHP, C#, Rust x2) either rejects the input or Unicode-replaces the surrogate; Ruby is alone in preserving it, which breaks byte-for-byte cross-SDK canonical equality. Vectors preserve the 11-required-field shape and use aiInvocation/parties/decisionContextDigest as the injection surfaces so the matrix reuses the existing tuple-array plumbing without shape changes.",
+  "vectors": [
+    {
+      "name": "nfc-cafe-toolname",
+      "category": "unicode-normalization",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-01",
+        "timestamp": "2026-08-30T14:00:00.000Z",
+        "method": "tools/call",
+        "toolName": "caf\u00e9_lookup",
+        "namespace": "unicode",
+        "upstream": "u-svc",
+        "principal": "user:alice@example.com",
+        "durationMs": 12,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": [
+        "swift"
+      ]
+    },
+    {
+      "name": "nfd-cafe-toolname",
+      "category": "unicode-normalization",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-02",
+        "timestamp": "2026-08-30T14:00:01.000Z",
+        "method": "tools/call",
+        "toolName": "cafe\u0301_lookup",
+        "namespace": "unicode",
+        "upstream": "u-svc",
+        "principal": "user:alice@example.com",
+        "durationMs": 12,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": [
+        "swift"
+      ]
+    },
+    {
+      "name": "nfd-hangul-principal",
+      "category": "unicode-normalization",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-03",
+        "timestamp": "2026-08-30T14:00:02.000Z",
+        "method": "tools/call",
+        "toolName": "korean_service",
+        "namespace": "i18n",
+        "upstream": "kr-svc",
+        "principal": "user:\u1112\u1161\u11ab@example.kr",
+        "durationMs": 30,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": [
+        "swift"
+      ]
+    },
+    {
+      "name": "lone-high-surrogate-toolname",
+      "category": "lone-surrogate",
+      "expected_behavior": "REJECT",
+      "record": {
+        "id": "adv-04",
+        "timestamp": "2026-08-30T14:00:03.000Z",
+        "method": "tools/call",
+        "toolName": "bad\ud83dname",
+        "namespace": "surrogates",
+        "upstream": "s-svc",
+        "principal": "user:tester",
+        "durationMs": 1,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": [
+        "go",
+        "csharp",
+        "python",
+        "php"
+      ]
+    },
+    {
+      "name": "lone-low-surrogate-principal",
+      "category": "lone-surrogate",
+      "expected_behavior": "REJECT",
+      "record": {
+        "id": "adv-05",
+        "timestamp": "2026-08-30T14:00:04.000Z",
+        "method": "tools/call",
+        "toolName": "identity_check",
+        "namespace": "surrogates",
+        "upstream": "s-svc",
+        "principal": "user:\ude00tail",
+        "durationMs": 4,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": [
+        "go",
+        "csharp",
+        "python",
+        "php"
+      ]
+    },
+    {
+      "name": "reversed-surrogate-pair-namespace",
+      "category": "lone-surrogate",
+      "expected_behavior": "REJECT",
+      "record": {
+        "id": "adv-06",
+        "timestamp": "2026-08-30T14:00:05.000Z",
+        "method": "tools/call",
+        "toolName": "any_tool",
+        "namespace": "ns\udc00\ud800end",
+        "upstream": "s-svc",
+        "principal": "user:tester",
+        "durationMs": 2,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": [
+        "go",
+        "csharp",
+        "python",
+        "php",
+        "ruby"
+      ]
+    },
+    {
+      "name": "deep-object-nesting-ai-invocation",
+      "category": "deep-nesting",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-07",
+        "timestamp": "2026-08-30T14:00:06.000Z",
+        "method": "tools/call",
+        "toolName": "nested_tool",
+        "namespace": "recursion",
+        "upstream": "r-svc",
+        "principal": "user:tester",
+        "durationMs": 8,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis",
+        "aiInvocation": {
+          "n": {
+            "n": {
+              "n": {
+                "n": {
+                  "n": {
+                    "n": {
+                      "n": {
+                        "n": {
+                          "n": {
+                            "n": {
+                              "n": {
+                                "n": "bottom"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "suspected_divergent_sdks": [
+        "python",
+        "java"
+      ]
+    },
+    {
+      "name": "deep-array-nesting-ai-invocation",
+      "category": "deep-nesting",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-08",
+        "timestamp": "2026-08-30T14:00:07.000Z",
+        "method": "tools/call",
+        "toolName": "array_nest_tool",
+        "namespace": "recursion",
+        "upstream": "r-svc",
+        "principal": "user:tester",
+        "durationMs": 9,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis",
+        "aiInvocation": {
+          "tags": [
+            [
+              [
+                [
+                  [
+                    [
+                      [
+                        [
+                          [
+                            [
+                              [
+                                [
+                                  [
+                                    "deep"
+                                  ]
+                                ]
+                              ]
+                            ]
+                          ]
+                        ]
+                      ]
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        }
+      },
+      "suspected_divergent_sdks": [
+        "python",
+        "java"
+      ]
+    },
+    {
+      "name": "max-safe-integer-duration",
+      "category": "integer-edge",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-09",
+        "timestamp": "2026-08-30T14:00:08.000Z",
+        "method": "tools/call",
+        "toolName": "long_batch",
+        "namespace": "compute",
+        "upstream": "b-svc",
+        "principal": "service:scheduler",
+        "durationMs": 9007199254740991,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": []
+    },
+    {
+      "name": "min-safe-integer-duration",
+      "category": "integer-edge",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-10",
+        "timestamp": "2026-08-30T14:00:09.000Z",
+        "method": "tools/call",
+        "toolName": "clock_skew_task",
+        "namespace": "compute",
+        "upstream": "b-svc",
+        "principal": "service:scheduler",
+        "durationMs": -9007199254740991,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": [
+        "php"
+      ]
+    },
+    {
+      "name": "one-past-max-safe-integer",
+      "category": "integer-edge",
+      "expected_behavior": "REJECT",
+      "record": {
+        "id": "adv-11",
+        "timestamp": "2026-08-30T14:00:10.000Z",
+        "method": "tools/call",
+        "toolName": "overflow_batch",
+        "namespace": "compute",
+        "upstream": "b-svc",
+        "principal": "service:scheduler",
+        "durationMs": 9007199254740992,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": [
+        "typescript",
+        "javascript"
+      ]
+    },
+    {
+      "name": "one-past-min-safe-integer",
+      "category": "integer-edge",
+      "expected_behavior": "REJECT",
+      "record": {
+        "id": "adv-12",
+        "timestamp": "2026-08-30T14:00:11.000Z",
+        "method": "tools/call",
+        "toolName": "overflow_neg",
+        "namespace": "compute",
+        "upstream": "b-svc",
+        "principal": "service:scheduler",
+        "durationMs": -9007199254740992,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": [
+        "typescript",
+        "javascript"
+      ]
+    },
+    {
+      "name": "empty-ai-invocation-object",
+      "category": "empty-structure",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-13",
+        "timestamp": "2026-08-30T14:00:12.000Z",
+        "method": "tools/call",
+        "toolName": "no_ai_meta",
+        "namespace": "meta",
+        "upstream": "m-svc",
+        "principal": "user:tester",
+        "durationMs": 5,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis",
+        "aiInvocation": {}
+      },
+      "suspected_divergent_sdks": [
+        "swift"
+      ]
+    },
+    {
+      "name": "empty-scope-inside-party",
+      "category": "empty-structure",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-14",
+        "timestamp": "2026-08-30T14:00:13.000Z",
+        "method": "tools/call",
+        "toolName": "attribution_probe",
+        "namespace": "parties",
+        "upstream": "p-svc",
+        "principal": "user:tester",
+        "durationMs": 6,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis",
+        "parties": [
+          {
+            "party": "gateway",
+            "role": "witness",
+            "scope": []
+          }
+        ]
+      },
+      "suspected_divergent_sdks": []
+    },
+    {
+      "name": "parties-mixed-string-and-object",
+      "category": "mixed-type-array",
+      "expected_behavior": "MAY_DIVERGE",
+      "record": {
+        "id": "adv-15",
+        "timestamp": "2026-08-30T14:00:14.000Z",
+        "method": "tools/call",
+        "toolName": "party_mix_probe",
+        "namespace": "parties",
+        "upstream": "p-svc",
+        "principal": "user:tester",
+        "durationMs": 7,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis",
+        "parties": [
+          {
+            "party": "gateway",
+            "role": "witness",
+            "scope": [
+              "id"
+            ]
+          },
+          "not-a-party-object"
+        ]
+      },
+      "suspected_divergent_sdks": [
+        "rust",
+        "kotlin",
+        "csharp"
+      ]
+    },
+    {
+      "name": "ai-invocation-mixed-value-array",
+      "category": "mixed-type-array",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-16",
+        "timestamp": "2026-08-30T14:00:15.000Z",
+        "method": "tools/call",
+        "toolName": "mixed_array_probe",
+        "namespace": "meta",
+        "upstream": "m-svc",
+        "principal": "user:tester",
+        "durationMs": 11,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis",
+        "aiInvocation": {
+          "mix": [
+            1,
+            "two",
+            true,
+            null,
+            3.14,
+            false,
+            0
+          ]
+        }
+      },
+      "suspected_divergent_sdks": [
+        "swift"
+      ]
+    },
+    {
+      "name": "sort-collision-supplementary-vs-pua",
+      "category": "sort-collision",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-17",
+        "timestamp": "2026-08-30T14:00:16.000Z",
+        "method": "tools/call",
+        "toolName": "sort_probe_a",
+        "namespace": "sort",
+        "upstream": "s-svc",
+        "principal": "user:tester",
+        "durationMs": 14,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis",
+        "aiInvocation": {
+          "\ud800\udc00": "supp",
+          "\ue000": "pua"
+        }
+      },
+      "suspected_divergent_sdks": [
+        "python",
+        "go",
+        "rust",
+        "swift",
+        "java"
+      ]
+    },
+    {
+      "name": "sort-collision-emoji-vs-pua",
+      "category": "sort-collision",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-18",
+        "timestamp": "2026-08-30T14:00:17.000Z",
+        "method": "tools/call",
+        "toolName": "sort_probe_b",
+        "namespace": "sort",
+        "upstream": "s-svc",
+        "principal": "user:tester",
+        "durationMs": 15,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis",
+        "aiInvocation": {
+          "\ud83d\ude00": "grin",
+          "\uf8ff": "pua-high"
+        }
+      },
+      "suspected_divergent_sdks": [
+        "python",
+        "go",
+        "rust",
+        "swift",
+        "java"
+      ]
+    },
+    {
+      "name": "zwj-in-principal",
+      "category": "zwj-rtl",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-19",
+        "timestamp": "2026-08-30T14:00:18.000Z",
+        "method": "tools/call",
+        "toolName": "zwj_probe",
+        "namespace": "bidi",
+        "upstream": "b-svc",
+        "principal": "user:al\u200dice@example.com",
+        "durationMs": 20,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": []
+    },
+    {
+      "name": "rtl-override-toolname",
+      "category": "zwj-rtl",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-20",
+        "timestamp": "2026-08-30T14:00:19.000Z",
+        "method": "tools/call",
+        "toolName": "safe\u202egnp.exe",
+        "namespace": "bidi",
+        "upstream": "b-svc",
+        "principal": "user:tester",
+        "durationMs": 21,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": []
+    },
+    {
+      "name": "bidi-hebrew-mixed-with-ltr-mark",
+      "category": "zwj-rtl",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-21",
+        "timestamp": "2026-08-30T14:00:20.000Z",
+        "method": "tools/call",
+        "toolName": "hebrew_probe",
+        "namespace": "bidi",
+        "upstream": "b-svc",
+        "principal": "user:\u202dshalom\u202c_\u05e9\u05dc\u05d5\u05dd@example.il",
+        "durationMs": 22,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": []
+    },
+    {
+      "name": "c0-controls-in-toolname",
+      "category": "escaped-control",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-22",
+        "timestamp": "2026-08-30T14:00:21.000Z",
+        "method": "tools/call",
+        "toolName": "ctrl\u0001\u0002\u001fname",
+        "namespace": "controls",
+        "upstream": "c-svc",
+        "principal": "user:tester",
+        "durationMs": 25,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": [
+        "php",
+        "ruby"
+      ]
+    },
+    {
+      "name": "html-metacharacters-toolname",
+      "category": "escaped-control",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-23",
+        "timestamp": "2026-08-30T14:00:22.000Z",
+        "method": "tools/call",
+        "toolName": "<script>alert(&x)</script>/path",
+        "namespace": "controls",
+        "upstream": "c-svc",
+        "principal": "user:tester",
+        "durationMs": 26,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": [
+        "php",
+        "go"
+      ]
+    },
+    {
+      "name": "bool-int-adjacent-values",
+      "category": "boolean-integer-overlap",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-24",
+        "timestamp": "2026-08-30T14:00:23.000Z",
+        "method": "tools/call",
+        "toolName": "llm_call",
+        "namespace": "ai",
+        "upstream": "ai-svc",
+        "principal": "user:tester",
+        "durationMs": 30,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis",
+        "aiInvocation": {
+          "temperature": 0,
+          "top_k": 1,
+          "streamingEnabled": true
+        }
+      },
+      "suspected_divergent_sdks": [
+        "swift",
+        "objective-c"
+      ]
+    },
+    {
+      "name": "bool-int-full-quartet",
+      "category": "boolean-integer-overlap",
+      "expected_behavior": "CONVERGE",
+      "record": {
+        "id": "adv-25",
+        "timestamp": "2026-08-30T14:00:24.000Z",
+        "method": "tools/call",
+        "toolName": "llm_call_v2",
+        "namespace": "ai",
+        "upstream": "ai-svc",
+        "principal": "user:tester",
+        "durationMs": 31,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis",
+        "aiInvocation": {
+          "alpha": true,
+          "beta": 1,
+          "gamma": 0,
+          "delta": false
+        }
+      },
+      "suspected_divergent_sdks": [
+        "swift",
+        "objective-c",
+        "php"
+      ]
+    },
+    {
+      "name": "adv-ruby-lone-trailing",
+      "category": "lone-surrogate",
+      "expected_behavior": "REJECT",
+      "notes": "Ruby-json 2.7.2 finding: a lone trailing low surrogate \\uDE04 in a string body is silently accepted by Ruby's stdlib JSON.parse and stored as a 3-byte CESU-8/WTF-8 sequence rather than being rejected as unpaired UTF-16. Every other SDK in the matrix (JS, Python, Go, Java, Kotlin, Swift, PHP, C#, and both Rust JCS variants) either rejects the input outright or replaces the surrogate with U+FFFD. Ruby alone preserves it, which breaks byte-for-byte cross-SDK canonical equality. Adjacent to adv-04..adv-06 but isolates the lone-trailing case specifically because the Ruby divergence only surfaces in that sub-pattern.",
+      "record": {
+        "id": "adv-ruby-lone-trailing",
+        "timestamp": "2026-08-31T00:00:00.000Z",
+        "method": "tools/call",
+        "toolName": "identity_check",
+        "namespace": "surrogates",
+        "upstream": "s-svc",
+        "principal": "user:\ude04@example.com",
+        "durationMs": 3,
+        "success": true,
+        "errorCode": null,
+        "previousHash": "genesis"
+      },
+      "suspected_divergent_sdks": [
+        "ruby"
+      ]
+    }
+  ]
+}

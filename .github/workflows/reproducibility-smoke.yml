@@ -1,0 +1,22 @@
+name: Reproducibility smoke
+
+on: [push, pull_request]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up reproducible environment
+        run: bash scripts/reproduce/setup.sh
+
+      - name: Run smoke test
+        run: bash scripts/reproduce/smoke-test.sh
+
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-output
+          path: /tmp/smoke-*.jsonl

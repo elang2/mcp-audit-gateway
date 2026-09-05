@@ -1,0 +1,345 @@
+# syntax=docker/dockerfile:1.7
+#
+# Dockerfile.replication.v2 — cross-emitter signature-verification matrix
+# ---------------------------------------------------------------------------
+# REDESIGN vs v1: every language toolchain now comes from its own official
+# Docker Hub image (node:22, python:3.11, golang:1.24, ...). The v1 file
+# built each toolchain by hand inside a shared `FROM ubuntu:22.04 AS base`
+# layer using apt/wget/PPAs, and every stage carried its own class of
+# apt-repo, GPG-key, PPA-outage, or tarball-URL failure — the "each stage
+# reveals a new bug" pattern.
+#
+# In v2 each stage is `FROM <official-image>` and does nothing except
+# provide a stable, upstream-CI-tested source of one toolchain. The final
+# runtime stage `COPY --from=<stage>` pulls the installed toolchain trees
+# into a single `debian:bookworm-slim` runtime. If a stage breaks, the
+# blame is upstream on Docker Hub, not on our Dockerfile.
+#
+# See Dockerfile.replication.v2.README.md for the design rationale, the
+# glibc-compatibility argument for choosing debian:bookworm-slim as the
+# runtime base, and the (deliberate) trade-offs vs v1.
+# ---------------------------------------------------------------------------
+
+# ===========================================================================
+# STAGE: node — Node.js 22 LTS
+# Official image: node:22-bookworm  (Debian 12 base, glibc 2.36)
+# Contents used: /usr/local/{bin,lib,include,share}
+# ===========================================================================
+FROM node:22-bookworm AS node-stage
+
+# ===========================================================================
+# STAGE: python — CPython 3.11
+# Official image: python:3.11-bookworm
+# Contents used: /usr/local/{bin,lib,include}  (python3.11 + stdlib)
+# Third-party wheels for the JCS lane are installed here so they land in
+# /usr/local/lib/python3.11/site-packages and travel with the COPY.
+# ===========================================================================
+FROM python:3.11-bookworm AS python-stage
+RUN pip install --no-cache-dir --root-user-action=ignore \
+        rfc8785==0.1.4 \
+        cryptography==43.0.1 \
+        pynacl==1.5.0
+
+# ===========================================================================
+# STAGE: go — Go 1.24
+# Official image: golang:1.24-bookworm
+# Contents used: /usr/local/go  (self-contained toolchain tree)
+# Go binaries produced downstream are statically linked, so runtime libc
+# is irrelevant for them.
+# ===========================================================================
+FROM golang:1.24-bookworm AS go-stage
+
+# ===========================================================================
+# STAGE: jdk — Eclipse Temurin OpenJDK 21
+# Official image: eclipse-temurin:21-jdk-jammy
+# Contents used: /opt/java/openjdk  (self-contained JDK tree)
+# Java bytecode is architecture- and libc-portable; a JDK built on
+# jammy (glibc 2.35) runs fine on bookworm (glibc 2.36).
+# ===========================================================================
+FROM eclipse-temurin:21-jdk-jammy AS jdk-stage
+
+# ===========================================================================
+# STAGE: kotlin — Kotlin 2.0.21 compiler on top of Temurin 21
+# There is no first-party official Kotlin image on Docker Hub. We build
+# this stage `FROM eclipse-temurin:21-jdk-jammy` (which is itself an
+# upstream-CI-tested image) and drop the JetBrains-published compiler
+# zip on top. The kotlinc distribution is a pure-JVM tool, so it works
+# unchanged against the runtime JDK.
+# ===========================================================================
+FROM eclipse-temurin:21-jdk-jammy AS kotlin-stage
+ARG KOTLIN_VERSION=2.0.21
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl unzip ca-certificates && \
+    curl -fsSL -o /tmp/kotlin.zip \
+        "https://github.com/JetBrains/kotlin/releases/download/v${KOTLIN_VERSION}/kotlin-compiler-${KOTLIN_VERSION}.zip" && \
+    unzip -q /tmp/kotlin.zip -d /opt && \
+    rm /tmp/kotlin.zip && \
+    apt-get purge -y curl unzip && apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* && \
+    /opt/kotlinc/bin/kotlinc -version 2>&1
+
+# ===========================================================================
+# STAGE: dotnet — .NET SDK 9.0
+# Official image: mcr.microsoft.com/dotnet/sdk:9.0-bookworm-slim
+# Contents used: /usr/share/dotnet  (self-contained SDK tree)
+# ===========================================================================
+FROM mcr.microsoft.com/dotnet/sdk:9.0-bookworm-slim AS dotnet-stage
+
+# ===========================================================================
+# STAGE: rust-builder — Rust 1.98 toolchain + prebuilt rust-signer binaries
+# Official image: rust:1.98-slim-bookworm  (ships rustc, cargo, and a full
+# gcc/binutils toolchain so `cargo build` has a working system linker)
+# Contents used downstream: only the four release binaries under
+# /rust-signer/target/release/. We deliberately do NOT copy the rustup /
+# cargo trees into the runtime — the runtime is debian:bookworm-slim, which
+# has no cc/ld, so a runtime-stage `cargo build` fails at link time with
+# "linker `cc` not found". Compiling here and COPYing the finished binaries
+# keeps the runtime slim and the build hermetic.
+# ===========================================================================
+FROM rust:1.98-slim-bookworm AS rust-builder
+WORKDIR /rust-signer
+COPY test/vectors/cross-emitter-matrix/rust-signer/Cargo.toml   Cargo.toml
+COPY test/vectors/cross-emitter-matrix/rust-signer/Cargo.lock   Cargo.lock
+COPY test/vectors/cross-emitter-matrix/rust-signer/src          ./src
+RUN cargo build --release --locked && \
+    ls -la target/release/sign target/release/verify \
+           target/release/sign_jcs_serde_jcs target/release/sign_jcs_canonicalizer
+
+# ===========================================================================
+# STAGE: swift — Swift 6.0
+# Official image: swift:6.0-jammy  (Ubuntu 22.04, glibc 2.35)
+# Contents used: /usr/share/swift  (self-contained Swift tree, ships its
+# own stdlib and Foundation implementation under lib/swift/linux/)
+# NOTE on runtime compatibility: swift-corelibs-foundation on Linux is
+# NOT byte-identical with Apple's Foundation on Darwin. The smoke test
+# filters Swift to darwin only (SDK_LANES.sw.extraNeeds in
+# test/vectors/smoke/smoke-conformance.mjs). Inside this Linux container
+# the Swift toolchain is INSTALLED but the smoke test SKIPS the Swift
+# lane unless the file's platform guard is patched. See
+# docker/replication.md.
+# ===========================================================================
+FROM swift:6.0-jammy AS swift-stage
+
+# ===========================================================================
+# STAGE: ruby — Ruby 3.3
+# Official image: ruby:3.3-bookworm
+# Contents used: /usr/local/{bin,lib,include}  (ruby + rubygems + gems)
+# ed25519 and json-canonicalization gems installed here so they land in
+# /usr/local/lib/ruby/gems/3.3.0 and travel with the COPY.
+# ===========================================================================
+FROM ruby:3.3-bookworm AS ruby-stage
+RUN gem install --no-document \
+        ed25519:1.3.0 \
+        json-canonicalization:1.0.0
+
+# ===========================================================================
+# STAGE: php — PHP 8.3 CLI + Composer + composer deps
+# Official images: php:8.3-cli-bookworm  and  composer:2 (for the binary)
+# Contents used: /usr/local/{bin,lib,include}  (php + extensions),
+#                /usr/local/bin/composer      (from composer:2),
+#                /opt/php-deps                (composer-managed vendor tree)
+# sodium is a bundled ext in the official php:8.3-cli image, no PPA needed.
+# ===========================================================================
+FROM composer:2 AS composer-stage
+
+FROM php:8.3-cli-bookworm AS php-stage
+COPY --from=composer-stage /usr/bin/composer /usr/local/bin/composer
+# The sodium extension needs libsodium at build time on the official
+# php image; use pecl/php's install helper. zip is required by composer
+# to unpack downloaded packages, and needs libzip-dev at build time plus
+# the unzip binary at runtime; docker-php-ext-install is the canonical
+# extension helper on the official php:8.3-cli image.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libsodium-dev libzip-dev libgmp-dev unzip && \
+    docker-php-ext-install -j"$(nproc)" sodium gmp zip && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    php -m | grep -qi sodium && \
+    php -m | grep -qi '^zip$'
+ENV COMPOSER_ALLOW_SUPERUSER=1 \
+    COMPOSER_HOME=/opt/composer-cache
+RUN mkdir -p /opt/php-deps && cd /opt/php-deps && \
+    composer require --no-interaction --no-progress \
+        root23/php-json-canonicalization:1.0.1
+
+# ===========================================================================
+# STAGE: runtime — merged final image
+# Base: debian:bookworm-slim  (glibc 2.36)
+#
+# Layout after COPYs:
+#   /usr/local              Node + Python + Ruby + PHP + composer
+#                           (each stage's /usr/local layered on top of the
+#                           previous; the paths don't collide on binaries
+#                           or on lib/<lang> subdirs)
+#   /usr/local/go           Go
+#   /opt/java/openjdk       Temurin JDK 21
+#   /opt/kotlinc            Kotlin compiler
+#   /usr/share/dotnet       .NET SDK
+#   /usr/local/rustup       Rust toolchains
+#   /usr/local/cargo        Cargo registry + bin
+#   /usr/share/swift        Swift toolchain
+#   /opt/php-deps           composer vendor tree
+#   /work                   mcp-audit-gateway source tree (copied in below)
+# ===========================================================================
+FROM debian:bookworm-slim AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    TZ=UTC
+
+# Minimal runtime OS deps. These are needed by binaries copied from the
+# stages (dynamic linker resolution, TLS, curl for entrypoint smoke tests,
+# git for anything reading .git metadata, jq for the aggregate step).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl wget git jq unzip xz-utils \
+        libssl3 libreadline8 zlib1g libyaml-0-2 libffi8 \
+        libgmp10 libncurses6 libsqlite3-0 libbz2-1.0 \
+        libcurl4 libedit2 libxml2 libzip4 \
+        libonig5 libsodium23 libargon2-1 \
+        libgcc-s1 libstdc++6 libpython3.11 \
+        libicu72 libtinfo6 \
+     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# --- Node (bookworm → bookworm, identical libc) -----------------------------
+COPY --from=node-stage /usr/local /usr/local
+
+# --- Python (bookworm → bookworm) -------------------------------------------
+# Copying the whole /usr/local of the python stage on top of the node stage.
+# python and node do not share file names under bin/, lib/python3.11 vs
+# lib/node_modules keeps them apart, include/ headers are lang-specific,
+# and share/{doc,man} overlays are harmless.
+COPY --from=python-stage /usr/local /usr/local
+
+# --- Ruby (bookworm → bookworm) ---------------------------------------------
+# ruby ships /usr/local/bin/{ruby,gem,bundle,...}, /usr/local/lib/ruby,
+# /usr/local/lib/ruby/gems/3.3.0/. No collisions with node or python.
+COPY --from=ruby-stage /usr/local /usr/local
+
+# --- PHP (bookworm → bookworm) ----------------------------------------------
+# php ships /usr/local/bin/php, /usr/local/lib/php, /usr/local/etc/php.
+# No collisions with node/python/ruby binaries.
+COPY --from=php-stage /usr/local /usr/local
+COPY --from=php-stage /opt/php-deps /opt/php-deps
+
+# --- Go ---------------------------------------------------------------------
+COPY --from=go-stage /usr/local/go /usr/local/go
+
+# --- JDK 21 (Temurin) -------------------------------------------------------
+COPY --from=jdk-stage /opt/java/openjdk /opt/java/openjdk
+
+# --- Kotlin -----------------------------------------------------------------
+COPY --from=kotlin-stage /opt/kotlinc /opt/kotlinc
+
+# --- .NET SDK 9.0 -----------------------------------------------------------
+COPY --from=dotnet-stage /usr/share/dotnet /usr/share/dotnet
+RUN ln -sf /usr/share/dotnet/dotnet /usr/local/bin/dotnet && \
+    mkdir -p /root/.dotnet && \
+    ln -sf /usr/share/dotnet/dotnet /root/.dotnet/dotnet
+
+# --- Rust (prebuilt binaries only; no toolchain in runtime) -----------------
+# The runtime base (debian:bookworm-slim) intentionally has no cc/ld, so
+# any `cargo build` here would fail with "linker `cc` not found". Instead
+# we copy the four release binaries produced in the rust-builder stage.
+# They are dynamically linked against glibc only, and bookworm-slim's glibc
+# is a superset of what rust:1.98-slim-bookworm links against.
+COPY --from=rust-builder /rust-signer/target/release/sign                   /usr/local/bin/sign
+COPY --from=rust-builder /rust-signer/target/release/verify                 /usr/local/bin/verify
+COPY --from=rust-builder /rust-signer/target/release/sign_jcs_serde_jcs     /usr/local/bin/sign_jcs_serde_jcs
+COPY --from=rust-builder /rust-signer/target/release/sign_jcs_canonicalizer /usr/local/bin/sign_jcs_canonicalizer
+
+# --- Swift ------------------------------------------------------------------
+# The official swift image installs the toolchain to /usr/share/swift.
+# swift-corelibs-foundation ships its own libs under
+# /usr/share/swift/usr/lib/swift/linux/, so no host lib is required — but
+# the swift binary itself dynamically links against libpython3.10 on jammy;
+# on bookworm we have libpython3.11 installed above and set a compat symlink.
+COPY --from=swift-stage /usr/share/swift /usr/share/swift
+RUN if [ -f /usr/lib/x86_64-linux-gnu/libpython3.11.so.1.0 ] && \
+       [ ! -f /usr/lib/x86_64-linux-gnu/libpython3.10.so.1.0 ]; then \
+      ln -sf /usr/lib/x86_64-linux-gnu/libpython3.11.so.1.0 \
+             /usr/lib/x86_64-linux-gnu/libpython3.10.so.1.0 ; \
+    fi
+
+# --- PATH + env for all toolchains ------------------------------------------
+# NB: /usr/local/cargo/bin is intentionally absent — the runtime has no rust
+# toolchain, only the prebuilt binaries copied above into /usr/local/bin.
+ENV PATH=/usr/local/go/bin:/opt/kotlinc/bin:/usr/share/swift/usr/bin:/opt/java/openjdk/bin:/usr/share/dotnet:/usr/local/bin:/usr/bin:/bin \
+    JAVA_HOME=/opt/java/openjdk \
+    GOPATH=/root/go \
+    COMPOSER_ALLOW_SUPERUSER=1 \
+    COMPOSER_HOME=/opt/composer-cache \
+    NODE_OPTIONS=--no-deprecation \
+    SIGNING_KEY_HEX=0000000000000000000000000000000000000000000000000000000000000042
+
+# --- Sanity: every toolchain resolves before source-tree work ---------------
+# If any of these fail, the stage-COPY layout is broken and we want a clear
+# error BEFORE we spend minutes compiling the repo below.
+RUN set -eux; \
+    node --version; \
+    npm --version; \
+    python3 --version; \
+    ruby --version; \
+    php --version | head -1; \
+    php -m | grep -qi sodium; \
+    go version; \
+    java --version; \
+    kotlinc -version 2>&1 | head -1; \
+    dotnet --info | head -5; \
+    /usr/local/bin/sign --help 2>&1 | head -1 || /usr/local/bin/sign 2>&1 | head -1 || true; \
+    test -x /usr/local/bin/sign; \
+    test -x /usr/local/bin/verify; \
+    test -x /usr/local/bin/sign_jcs_serde_jcs; \
+    test -x /usr/local/bin/sign_jcs_canonicalizer; \
+    swift --version 2>&1 | head -1
+
+# ---------------------------------------------------------------------------
+# Source tree + repo-scoped builds
+# ---------------------------------------------------------------------------
+WORKDIR /work
+COPY --chown=root:root . /work
+
+# The sign.rb / verify.rb Ruby lane hard-codes a $LOAD_PATH.unshift for a
+# developer-machine gem path. Expose the real gem paths via RUBYLIB so
+# `require 'ed25519'` / `require 'json/canonicalization'` resolve.
+ENV RUBYLIB=/usr/local/lib/ruby/gems/3.3.0/gems/ed25519-1.3.0/lib:/usr/local/lib/ruby/gems/3.3.0/gems/json-canonicalization-1.0.0/lib
+
+# --- npm install (harness deps only, no dev noise) --------------------------
+RUN cd /work && npm ci --omit=dev --no-audit --no-fund \
+    || npm install --no-audit --no-fund
+
+# --- expose the prebuilt Rust binaries at the path the smoke test expects ---
+# test/vectors/smoke/smoke-conformance.mjs and run-matrix.sh both look for
+# the binaries at ${MATRIX}/rust-signer/target/release/{sign,verify,...}
+# rather than on $PATH, so symlink the /usr/local/bin copies into that tree.
+RUN mkdir -p /work/test/vectors/cross-emitter-matrix/rust-signer/target/release && \
+    ln -sf /usr/local/bin/sign                   /work/test/vectors/cross-emitter-matrix/rust-signer/target/release/sign && \
+    ln -sf /usr/local/bin/verify                 /work/test/vectors/cross-emitter-matrix/rust-signer/target/release/verify && \
+    ln -sf /usr/local/bin/sign_jcs_serde_jcs     /work/test/vectors/cross-emitter-matrix/rust-signer/target/release/sign_jcs_serde_jcs && \
+    ln -sf /usr/local/bin/sign_jcs_canonicalizer /work/test/vectors/cross-emitter-matrix/rust-signer/target/release/sign_jcs_canonicalizer
+
+# --- compile C# projects ----------------------------------------------------
+RUN cd /work/test/vectors/cross-emitter-matrix/csharp-signer && \
+    dotnet build -c Release Sign.csproj && \
+    dotnet build -c Release SignJcs.csproj
+RUN cd /work/test/vectors/cross-emitter-matrix/csharp-verifier && \
+    dotnet build -c Release Verify.csproj
+
+# --- compile Java sources against pre-vendored Jackson jars -----------------
+RUN cd /work/test/vectors/cross-emitter-matrix && \
+    javac -cp "../runners/jackson-core.jar:../runners/jackson-databind.jar:../runners/jackson-annotations.jar:../runners/java-json-canonicalization-1.1.jar:." \
+          Sign.java Verify.java SignJcs.java
+
+# --- prebuild Go binaries so runtime spawns don't recompile -----------------
+RUN cd /work/test/vectors/cross-emitter-matrix && \
+    go build -o /usr/local/bin/mcp-sign-go sign.go && \
+    go build -o /usr/local/bin/mcp-verify-go verify.go && \
+    go build -o /usr/local/bin/mcp-sign-jcs-go sign-jcs.go
+
+# --- entrypoint -------------------------------------------------------------
+COPY docker/replication-entrypoint.sh /usr/local/bin/replication-entrypoint.sh
+RUN chmod +x /usr/local/bin/replication-entrypoint.sh
+
+VOLUME ["/work/out"]
+
+ENTRYPOINT ["/usr/local/bin/replication-entrypoint.sh"]
+CMD ["smoke"]

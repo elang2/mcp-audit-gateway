@@ -1,0 +1,121 @@
+# .dockerignore — minimize Docker build context for multi-stage builds
+#
+# Goal: reduce build context from ~439 MB to <50 MB.
+# Strategy: exclude everything heavy, then re-include only what the
+# Dockerfile actually needs (src/, chosen test vectors, docker/,
+# scripts/reproduce/, package manifests, main README).
+
+# ---------------------------------------------------------------------------
+# Build artifacts — heavy per-language build outputs
+# ---------------------------------------------------------------------------
+test/vectors/cross-emitter-matrix/bin/
+test/vectors/cross-emitter-matrix/rust-signer/target/
+test/vectors/cross-emitter-matrix/csharp-signer/bin/
+test/vectors/cross-emitter-matrix/csharp-signer/obj/
+test/vectors/cross-emitter-matrix/csharp-verifier/bin/
+test/vectors/cross-emitter-matrix/csharp-verifier/obj/
+test/vectors/cross-emitter-matrix/__pycache__/
+**/target/
+**/node_modules/
+**/dist/
+**/.git/
+**/.gitignore
+
+# JVM compiled class files (heavy per-invocation output)
+**/*.class
+
+# ---------------------------------------------------------------------------
+# OS + editor cruft
+# ---------------------------------------------------------------------------
+.DS_Store
+**/.DS_Store
+.vscode/
+.idea/
+**/.vscode/
+**/.idea/
+
+# ---------------------------------------------------------------------------
+# Language caches
+# ---------------------------------------------------------------------------
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# ---------------------------------------------------------------------------
+# Documentation not needed inside the image
+# (main README.md and selected docs are re-included below)
+# ---------------------------------------------------------------------------
+*.md
+docs/
+
+# ---------------------------------------------------------------------------
+# Private / do-not-push directories
+# ---------------------------------------------------------------------------
+eb/
+.aix/
+.claude/
+.playwright-mcp/
+
+# ---------------------------------------------------------------------------
+# Local env, logs, coverage
+# ---------------------------------------------------------------------------
+.env
+.env.*
+*.log
+coverage/
+.nyc_output/
+
+# ---------------------------------------------------------------------------
+# RE-INCLUDES — what the Docker build actually needs
+# ---------------------------------------------------------------------------
+
+# Documentation kept in the image
+!README.md
+!scripts/reproduce/README.md
+!docker/README.md
+!docker/replication.md
+
+# Cross-emitter matrix: keep source files, drop the rest
+!test/vectors/cross-emitter-matrix/*.mjs
+!test/vectors/cross-emitter-matrix/*.py
+!test/vectors/cross-emitter-matrix/*.go
+!test/vectors/cross-emitter-matrix/*.rb
+!test/vectors/cross-emitter-matrix/*.php
+!test/vectors/cross-emitter-matrix/*.java
+!test/vectors/cross-emitter-matrix/*.kts
+!test/vectors/cross-emitter-matrix/*.cs
+!test/vectors/cross-emitter-matrix/*.rs
+!test/vectors/cross-emitter-matrix/*.swift
+!test/vectors/cross-emitter-matrix/*.json
+!test/vectors/cross-emitter-matrix/*.sh
+!test/vectors/cross-emitter-matrix/go.mod
+!test/vectors/cross-emitter-matrix/go.sum
+
+# Rust signer sources (keep src/, keep manifests; target/ stays excluded above)
+!test/vectors/cross-emitter-matrix/rust-signer/Cargo.toml
+!test/vectors/cross-emitter-matrix/rust-signer/Cargo.lock
+!test/vectors/cross-emitter-matrix/rust-signer/src/
+!test/vectors/cross-emitter-matrix/rust-signer/src/**
+
+# C# signer/verifier sources (keep .cs and .csproj; bin/obj stay excluded)
+!test/vectors/cross-emitter-matrix/csharp-signer/*.cs
+!test/vectors/cross-emitter-matrix/csharp-signer/*.csproj
+!test/vectors/cross-emitter-matrix/csharp-verifier/*.cs
+!test/vectors/cross-emitter-matrix/csharp-verifier/*.csproj
+
+# Fuzzing and smoke vectors
+!test/vectors/fuzzing/
+!test/vectors/fuzzing/**
+!test/vectors/smoke/
+!test/vectors/smoke/**
+
+# Reproduce scripts
+!scripts/reproduce/
+!scripts/reproduce/**
+
+# Docker build inputs
+!docker/
+!docker/**

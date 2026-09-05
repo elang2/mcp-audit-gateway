@@ -1,0 +1,45 @@
+# Private trackers, planning docs, and session artifacts — must never be pushed
+eb/
+stage-2-config-*.json
+patent-fto-analysis-*.md
+*paper-plan-consolidated*.md
+*session-*-TODO.md
+*session-*-artifacts.md
+eb1a-*.md
+letter_*.md
+
+# Node / TypeScript
+node_modules/
+dist/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Rust
+target/
+.cargo/
+
+# .NET / C# / Java / native build output
+bin/
+obj/
+*.class
+*.o
+*.dylib
+*.so
+
+# Per-language cross-emitter matrix build directories
+test/vectors/cross-emitter-matrix/rust-signer/target/
+test/vectors/cross-emitter-matrix/csharp-signer/bin/
+test/vectors/cross-emitter-matrix/csharp-signer/obj/
+test/vectors/cross-emitter-matrix/csharp-verifier/bin/
+test/vectors/cross-emitter-matrix/csharp-verifier/obj/
+
+# Vendored PHP dependencies fetched into a local staging path — never commit
+test/vendor
+test/vendor/
+vendor/

@@ -257,7 +257,7 @@ async function verify(logPath?: string) {
 
   const resolved = resolve(logPath);
   const { verifyAuditLog } = await import("./attestation/verify.js");
-  const { HmacSigner, Ed25519Signer } = await import("./attestation/signer.js");
+  const { HmacSigner, Ed25519Signer, resolveConfigSecret } = await import("./attestation/signer.js");
 
   const { homedir } = await import("node:os");
   const { join } = await import("node:path");
@@ -270,7 +270,7 @@ async function verify(logPath?: string) {
     const config = GatewayConfigSchema.parse(JSON.parse(content));
 
     if (config.attestation.algorithm === "hmac-sha256" && config.attestation.secret) {
-      signer = new HmacSigner(config.attestation.secret);
+      signer = new HmacSigner(resolveConfigSecret(config.attestation.secret));
     } else {
       const edSigner = new Ed25519Signer(config.attestation.keyPath);
       await edSigner.init();

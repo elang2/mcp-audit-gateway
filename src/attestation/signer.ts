@@ -262,12 +262,30 @@ export function computeExtensionsDigest(extensions: Record<string, unknown>): st
   return createHash("sha256").update(serialized).digest("hex");
 }
 
+const ENV_VAR_PATTERN = /^\$\{([A-Z_][A-Z0-9_]*)\}$/;
+
+export function resolveConfigSecret(raw: string): string {
+  const m = raw.match(ENV_VAR_PATTERN);
+  if (!m) return raw;
+  const varName = m[1];
+  const value = process.env[varName];
+  if (!value) {
+    throw new Error(
+      `Config references env var \${${varName}} but it is unset or empty. ` +
+      `Set ${varName} to a 64-hex-char HMAC secret before starting the gateway.`
+    );
+  }
+  return value;
+}
+
 export function createSigner(config: AttestationConfig): Signer {
   if (!config.enabled) {
     return { sign: async () => "", verify: async () => true };
   }
   if (config.algorithm === "hmac-sha256") {
-    const secret = config.secret ?? randomBytes(32).toString("hex");
+    const secret = config.secret
+      ? resolveConfigSecret(config.secret)
+      : randomBytes(32).toString("hex");
     return new HmacSigner(secret);
   }
   return new Ed25519Signer(config.keyPath);

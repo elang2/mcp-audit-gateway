@@ -24,7 +24,7 @@
   "attestation": {
     "enabled": true,
     "algorithm": "hmac-sha256",
-    "secret": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    "secret": "${AUDIT_SECRET}"
   },
   "telemetry": {
     "enabled": false

@@ -1,0 +1,8 @@
+# Reconcile historical author-name spellings to the canonical form used on
+# ORCID (0009-0001-2643-0389) and in LICENSE / CITATION.cff. Purely cosmetic:
+# `git log` and GitHub display honor these mappings, commit bytes are
+# unchanged, and every tag and signed release remains byte-identical.
+
+Elankumaran Srinivasan <5340827+elang2@users.noreply.github.com> Elan Ansrinivasan <5340827+elang2@users.noreply.github.com>
+Elankumaran Srinivasan <5340827+elang2@users.noreply.github.com> Elan Srinivasan <5340827+elang2@users.noreply.github.com>
+Elankumaran Srinivasan <5340827+elang2@users.noreply.github.com> Elankumaran Srinviasan <elang2@gmail.com>

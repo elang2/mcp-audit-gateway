@@ -1,0 +1,42 @@
+cff-version: 1.2.0
+message: "If you use this vector set in academic or industry research, please cite as below."
+type: dataset
+title: "Cross-Emitter JSON Canonicalization Adversarial Vector Set"
+authors:
+  - family-names: Srinivasan
+    given-names: Elankumaran
+    orcid: "https://orcid.org/0009-0001-2643-0389"
+version: "0.1.0"
+date-released: 2026-09-07
+license: CC-BY-4.0
+repository-code: "https://github.com/elang2/mcp-audit-gateway"
+url: "https://github.com/elang2/mcp-audit-gateway/tree/main/test/vectors/cross-emitter-matrix"
+keywords:
+  - json
+  - canonicalization
+  - jcs
+  - rfc-8785
+  - unicode
+  - lone-surrogate
+  - test-vectors
+  - wycheproof
+  - differential-testing
+abstract: >-
+  Adversarial cross-emitter test vectors for JSON canonicalization schemes,
+  covering ten Wycheproof-style categories: unicode-normalization,
+  lone-surrogate, deep-nesting, integer-edge, empty-structure,
+  mixed-type-array, sort-collision, zwj-rtl, escaped-control, and
+  boolean-integer-overlap. Designed to surface byte-level divergences
+  across the ten official Model Context Protocol SDK implementations
+  (TypeScript, Python, Go, Swift, Java, Kotlin, C#, PHP, Ruby, Rust) and
+  by extension across any JSON parser or canonicalizer that consumes them.
+preferred-citation:
+  type: dataset
+  title: "Cross-Emitter JSON Canonicalization Adversarial Vector Set v0.1.0"
+  authors:
+    - family-names: Srinivasan
+      given-names: Elankumaran
+      orcid: "https://orcid.org/0009-0001-2643-0389"
+  year: 2026
+  version: "0.1.0"
+  url: "https://github.com/elang2/mcp-audit-gateway/tree/main/test/vectors/cross-emitter-matrix"

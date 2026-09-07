@@ -1,0 +1,34 @@
+{
+  "title": "mcp-audit-gateway",
+  "description": "Tamper-evident audit trails for Model Context Protocol (MCP) tool invocations, with a cross-emitter JSON canonicalization adversarial vector set covering ten Wycheproof-style categories across the ten official MCP SDK implementations.",
+  "creators": [
+    {
+      "name": "Srinivasan, Elankumaran",
+      "orcid": "0009-0001-2643-0389"
+    }
+  ],
+  "license": "MIT",
+  "upload_type": "software",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "audit",
+    "signing",
+    "canonicalization",
+    "jcs",
+    "rfc-8785",
+    "cross-language-conformance",
+    "differential-testing",
+    "ed25519",
+    "wycheproof"
+  ],
+  "access_right": "open",
+  "related_identifiers": [
+    {
+      "identifier": "10.5281/zenodo.22407941",
+      "relation": "isSupplementTo",
+      "resource_type": "dataset",
+      "scheme": "doi"
+    }
+  ]
+}

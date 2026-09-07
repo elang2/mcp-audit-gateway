@@ -5,9 +5,9 @@ title: "mcp-audit-gateway"
 authors:
   - family-names: Srinivasan
     given-names: Elankumaran
-    orcid: ""
+    orcid: "https://orcid.org/0009-0001-2643-0389"
 repository-code: "https://github.com/elang2/mcp-audit-gateway"
-license: Apache-2.0
+license: MIT
 preferred-citation:
   type: article
   title: "Tamper-Evident Audit Trails for AI Agent Tool Invocations: Design Pitfalls, Cross-Language Conformance, and a Reference Implementation"

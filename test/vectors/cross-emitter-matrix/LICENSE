@@ -1,0 +1,17 @@
+Cross-Emitter JSON Canonicalization Adversarial Vector Set
+Copyright (c) 2026 Elankumaran Srinivasan (ORCID: 0009-0001-2643-0389)
+
+This work is licensed under the Creative Commons Attribution 4.0 International License (CC-BY-4.0).
+
+You are free to:
+  - Share  - copy and redistribute the material in any medium or format
+  - Adapt  - remix, transform, and build upon the material for any purpose, even commercially
+
+Under the following terms:
+  - Attribution: You must give appropriate credit, provide a link to the license, and indicate if changes were made. You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.
+
+No additional restrictions: You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.
+
+Full license text: https://creativecommons.org/licenses/by/4.0/legalcode
+
+Note on scope: this LICENSE covers only the data files and schema documentation in this directory (adversarial-vectors.json, nested-vectors.json, SCHEMA.md, README.md) as a dataset. All source-code files in this directory (Sign.java, SignJcs.java, Verify.java, sign-jcs.*, sign.*, verify.*, verify-buggy.mjs, run-matrix.sh, and the csharp-signer/, csharp-verifier/, rust-signer/ subdirectories) remain under the repository's MIT License (see the LICENSE file at the repository root).

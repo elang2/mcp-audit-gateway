@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.8.2] - 2026-09-10
+
+### Added
+
+- Five cases added to `src/attestation/verify-audit-log-chain-mode.test.ts`, bringing that file to eight adversarial cases plus a clean-log baseline on `verifyAuditLog(path, signer, { verifyChain: true })`, the shipping path invoked by `cli.ts`. **Three of the file's reject cases are not new here.** Content tamper, delete and reorder landed in [`0d9f0d5`](https://github.com/elang2/mcp-audit-gateway/commit/0d9f0d5) on 2026-09-05, reached `main`, and were never carried by a tagged release, so v0.8.1 and earlier do not contain the file at all. v0.8.2 adds the fourth tamper class, a fabricated record inserted between two existing records, plus the four shape cases below.
+- Coverage history for the record. At v0.7.8, the tag under review when the gap was raised, the only test-side caller passing `{ verifyChain: true }` was a clean-log restart assertion in `bugfix.test.ts`, with no reject case on that path. Raised as `modelcontextprotocol/modelcontextprotocol#3004` (issuecomment-5523985337).
+- Four cases pinning the shape of insertion detection rather than only its occurrence. The two-invalid-records count for a mid-sequence insertion is asserted at tail lengths 4, 20 and 60, since it is invariant in tail length. A tail insertion is asserted to mark one record invalid, not two, so the stronger claim cannot be over-generalised. An inserted record carrying no `attestation` is asserted to leave the chain intact downstream. And a tail insert carrying a **correct** `previousHash` is asserted to be caught by the signature check alone, with zero chain-hash mismatches — `hashLine` is a bare SHA-256 over the stored line and takes no secret, so an attacker can always compute a valid link. At the tail specifically, that is the case chain mode cannot catch by itself: measured, a correctly-linked insert at the tail yields one signature error and zero chain-hash mismatches, while the same insert mid-sequence still desyncs the successor and yields two errors. So the blind spot is positional, and an error count bounds detection rather than compromise.
+
+### Rationale
+
+- The shipping CLI path and the records-based path assert the same property (append-only chain integrity) but diverge at the hash input: the CLI path hashes stored JSONL bytes via `hashLine`, the records-based path re-serializes the parsed record. The insert case additionally pins the two distinct chain-hash failure modes it produces, the fabricated record's own genesis-vs-rolling mismatch and the immediate successor's stale `previousHash`, by line number.
+- Records downstream of the successor re-sync because the rolling hash advances past them unchanged, so a mid-sequence insertion marks exactly two records invalid at any tail length. That advance is not unconditional, because the unparseable-JSON and missing-attestation branches `continue` before reaching it (`verify.ts:52` and `:60`; the advance is `verify.ts:99`). An inserted record with no `attestation` is therefore flagged for the missing attestation and leaves every later chain check green. It is detected, but not as a chain break, which is a design property of chain mode rather than a coverage gap, and it is asserted rather than noted.
+
+### Fixed
+
+- Corrected the header comment in `verify-audit-log-chain-mode.test.ts`, which described `chain.test.ts` as carrying four tamper cases. It carries three (delete, reorder, insert); the remaining `it()` block is the happy path, and it is the first in the file.
+
+### Note
+
+- `package.json` was not bumped for the `v0.8.1` tag and still read `0.8.0` at that tag. This release sets it to `0.8.2` directly. Versions between tags and the manifest are aligned again from here.
+
+## [0.8.1] - 2026-08-29
+
+Docs only, no version bump at the time. Expanded `SECURITY-DESIGN.md` and consolidated docs and code comments (`c249973`). No `src/` behaviour change. Recorded here because the tag existed with no CHANGELOG section, which made `[0.8.2]` appear to follow `[0.8.0]` directly.
+
 ## [0.8.0] - 2026-08-26
 
 ### Added

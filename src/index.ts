@@ -3,8 +3,20 @@ export { runWrapProxy } from "./wrap/proxy.js";
 export { McpServerAdapter } from "./proxy/mcp-server-adapter.js";
 export { UpstreamManager } from "./proxy/upstream-manager.js";
 export { PolicyEngine, computeDecisionContextDigest, type DecisionContext } from "./policy/engine.js";
-export { AuditLog } from "./attestation/audit-log.js";
-export { createSigner, HmacSigner, Ed25519Signer } from "./attestation/signer.js";
+// hashRecord is exported alongside canonicalizeRecord below so a consumer can
+// compare their own digest against this implementation's, which is what the
+// README's canonicalisation example demonstrates.
+export { AuditLog, hashRecord } from "./attestation/audit-log.js";
+export {
+  createSigner,
+  HmacSigner,
+  Ed25519Signer,
+  // Exported so consumers can check their own canonicalisation against this
+  // implementation's byte output, which is what the README's "Verify your
+  // canonicalization against ours" example documents. Previously the README
+  // showed `import { canonicalize }`, a name this package has never exported.
+  canonicalizeRecord,
+} from "./attestation/signer.js";
 export { ToolIntegrityMonitor } from "./attestation/tool-integrity.js";
 export { verifyAuditLog, verifyChainLines, verifyChain } from "./attestation/verify.js";
 export {

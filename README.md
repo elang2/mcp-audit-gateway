@@ -259,8 +259,8 @@ jobs:
 
       - name: Run cross-SDK differential tests
         run: |
-          npx cross-sdk-diff --json > results.json
-          npx cross-sdk-diff
+          npx mcp-diff --json > results.json
+          npx mcp-diff
 
       - name: Fail on new divergences
         run: |
@@ -310,29 +310,50 @@ The audit gateway's canonicalization was designed to be immune to all 26 diverge
 ### Verify your canonicalization against ours
 
 ```javascript
-import { canonicalize } from '@mcp-audit-gateway/core';
+import { canonicalizeRecord, hashRecord } from '@mcp-audit-gateway/core';
 
+// AuditRecord requires id, timestamp, method, durationMs and success.
 const record = {
+  id: '01J8XV2K9Q0000000000000000',
+  timestamp: '2026-08-16T14:32:01.000Z',
   method: 'tools/call',
   toolName: 'github/create_pr',
-  args: { title: 'Fix bug', body: '...' },
-  timestamp: '2026-08-16T14:32:01.000Z'
+  durationMs: 142,
+  success: true
 };
 
-const canonical = canonicalize(record);
-// Deterministic bytes regardless of key insertion order,
-// float formatting, or platform JSON encoder
+const canonical = canonicalizeRecord(record); // canonical string
+const digest = hashRecord(record);            // SHA-256 over those bytes
+// Deterministic regardless of key insertion order, float formatting,
+// or platform JSON encoder. Compare `digest` against your own.
 ```
 
-### Python verification (cross-language parity)
+### Verify a chain
 
-```python
-from mcp_audit_gateway import verify_chain
+```javascript
+import { verifyChainLines } from '@mcp-audit-gateway/core';
+import { readFileSync } from 'node:fs';
 
-results = verify_chain("/path/to/audit.jsonl")
-assert results.valid == results.total
-assert results.chain_breaks == 0
+const lines = readFileSync('/path/to/audit.jsonl', 'utf8').split('\n');
+const result = await verifyChainLines(lines);
+
+console.log(result.total);   // records examined
+console.log(result.valid);   // boolean: whole chain intact
+console.log(result.errors);  // per-record failures, empty when valid
 ```
+
+### Cross-language parity (Python)
+
+Parity is checked with the verifier script in this repository, not a published
+Python package. There is no `pip install` for this project.
+
+```bash
+python3 test/vectors/verify.py
+```
+
+It recomputes the canonical form from parsed records and hashes the stored line
+octets, so it proves the tuple-array canonical form reproduces across
+languages independently of the TypeScript implementation.
 
 ### Run the conformance vectors against your own implementation
 

@@ -1,11 +1,13 @@
 name: Publish Docker Image
 
+# Manual only. Previously ran on `push: tags: v*`, and the `paths` filter did
+# NOT suppress it — GitHub does not evaluate path filters for tag pushes, so
+# every tag rebuilt the image and moved the public `latest` and `0.8` pointers
+# regardless of whether anything under test/vectors had changed. Verified
+# against the v0.8.0 and v0.8.1 tag pushes, both of which ran.
+#
+#   gh workflow run "Publish Docker Image" --ref v0.8.2
 on:
-  push:
-    tags:
-      - 'v*'
-    paths:
-      - 'test/vectors/**'
   workflow_dispatch:
 
 env:

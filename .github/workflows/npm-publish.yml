@@ -1,14 +1,35 @@
 name: Publish to npm
 
+# Manual only. Previously ran on `release: [created]`, which made creating a
+# GitHub release an irreversible npm publish — an npm version can never be
+# reused, so a release created to fix notes or a tag URL also burned a version.
+# Publishing is now a separate, deliberate action:
+#
+#   gh workflow run "Publish to npm" --ref v0.8.2
+#
+# Pass the tag you intend to publish as `ref`; the job builds and tests that
+# exact tree before publishing.
 on:
-  release:
-    types: [created]
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type the version being published, e.g. 0.8.2'
+        required: true
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Confirm input matches package.json version
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          if [ "${{ inputs.confirm }}" != "$PKG" ]; then
+            echo "Refusing: input '${{ inputs.confirm }}' != package.json '$PKG'."
+            echo "Re-run against the ref whose package.json is the version you mean."
+            exit 1
+          fi
+          echo "Publishing $PKG"
       - uses: actions/setup-node@v4
         with:
           node-version: 20

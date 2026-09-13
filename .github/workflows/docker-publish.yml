@@ -6,6 +6,9 @@ name: Publish Docker Image
 # regardless of whether anything under test/vectors had changed. Verified
 # against the v0.8.0 and v0.8.1 tag pushes, both of which ran.
 #
+# This file already carried workflow_dispatch before that change, so dispatching
+# against the v0.8.2 tag does work here, unlike npm-publish.yml:
+#
 #   gh workflow run "Publish Docker Image" --ref v0.8.2
 on:
   workflow_dispatch:

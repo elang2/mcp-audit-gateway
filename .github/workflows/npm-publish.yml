@@ -5,10 +5,16 @@ name: Publish to npm
 # reused, so a release created to fix notes or a tag URL also burned a version.
 # Publishing is now a separate, deliberate action:
 #
-#   gh workflow run "Publish to npm" --ref v0.8.2
+#   gh workflow run "Publish to npm" --ref main -f confirm=0.8.2
 #
-# Pass the tag you intend to publish as `ref`; the job builds and tests that
-# exact tree before publishing.
+# Dispatch from a ref whose copy of THIS FILE already has workflow_dispatch.
+# That means `main` (or any later branch), not v0.8.2 and not any earlier tag —
+# workflow_dispatch resolves the workflow definition at the ref you pass, and
+# tags up to and including v0.8.2 still carry the old `release: [created]`
+# trigger, so GitHub refuses the dispatch. Publishing from `main` publishes
+# main's tree; for 0.8.2 that is identical to the v0.8.2 tree apart from
+# .github/, and the guard below refuses unless package.json at the ref matches
+# the version you type.
 on:
   workflow_dispatch:
     inputs:

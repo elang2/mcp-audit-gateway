@@ -342,6 +342,45 @@ console.log(result.valid);   // boolean: whole chain intact
 console.log(result.errors);  // per-record failures, empty when valid
 ```
 
+### Confirm what the policy actually evaluated
+
+Records emitted in gateway mode carry a `decisionContextDigest` binding the
+principal, the tool, the rule that matched, and the resulting effect. The
+signature proves the digest was not edited; it says nothing about whether the
+digest describes the policy you think was in force. Recompute it to check:
+
+```javascript
+import { verifyDecisionContextDigest } from '@mcp-audit-gateway/core';
+import { readFileSync } from 'node:fs';
+
+const policy = JSON.parse(readFileSync('gateway.config.json', 'utf8')).policy;
+const check = verifyDecisionContextDigest(record, policy);
+
+check.status;          // 'match' | 'mismatch' | 'unverifiable' | 'absent'
+check.effect;          // 'allow' | 'deny' — what this policy yields
+check.matchedRuleIndex // index into policy.rules, or null for the default effect
+```
+
+`matchedRule` and `effect` are not stored on the record, so they are recovered by
+re-running the policy against the record's tool identity. A `mismatch` means the
+record was not written under the policy you supplied — it does not distinguish an
+operator editing a rule from an attacker editing one.
+
+Whole-log form, which also reports a summary:
+
+```javascript
+import { verifyAuditLog } from '@mcp-audit-gateway/core';
+
+const result = await verifyAuditLog(path, signer, { policy });
+result.decisionContext; // { checked, matched, mismatched, unverifiable, absent }
+```
+
+Two limits worth knowing. A rate-limited deny depends on the gateway's request
+counters, which no verifier holds, so it is admitted as a candidate rather than
+derived and flagged in `check.rateLimitInferred`. And records written before the
+digest became order-independent are verified against the older algorithm too;
+`check.digestVersion` reports which one reproduced.
+
 ### Cross-language parity (Python)
 
 Parity is checked with the verifier script in this repository, not a published

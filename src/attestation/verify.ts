@@ -1,10 +1,15 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
-import type { AuditRecord, CheckpointRecord, ChainBreakRecord, ChainRecord } from "../types.js";
+import type { AuditRecord, CheckpointRecord, ChainBreakRecord, ChainRecord, PolicyRule, ToolEntry } from "../types.js";
 import { isCheckpoint, isChainBreak } from "../types.js";
 import { HmacSigner, Ed25519Signer, type Signer } from "./signer.js";
 import { hashRecord } from "./audit-log.js";
+import {
+  PolicyEngine,
+  computeDecisionContextDigest,
+  computeDecisionContextDigestV1,
+} from "../policy/engine.js";
 
 function hashLine(line: string): string {
   return createHash("sha256").update(line).digest("hex");
@@ -15,6 +20,8 @@ export interface VerifyResult {
   valid: number;
   invalid: number;
   errors: Array<{ line: number; id: string; reason: string }>;
+  /** Present only when {@link verifyAuditLog} was given a `policy`. */
+  decisionContext?: DecisionContextSummary;
 }
 
 export interface ChainVerifyResult {
@@ -23,12 +30,167 @@ export interface ChainVerifyResult {
   errors: Array<{ line: number; id: string; reason: string }>;
 }
 
+/**
+ * The policy a verifier holds, independent of the running gateway. Shaped to
+ * accept `GatewayConfig["policy"]` directly.
+ */
+export interface PolicySnapshot {
+  defaultEffect: "allow" | "deny";
+  rules: PolicyRule[];
+}
+
+export type DecisionContextStatus =
+  /** Stored digest reproduced from the record plus this policy. */
+  | "match"
+  /** Record carries no decisionContextDigest; nothing to check. */
+  | "absent"
+  /** Record lacks a field the context is built from, so no digest can be made. */
+  | "unverifiable"
+  /** Reproduced under no supported digest version: drift or tampering. */
+  | "mismatch";
+
+export interface DecisionContextCheck {
+  status: DecisionContextStatus;
+  storedDigest?: string;
+  /** Recomputation under the current algorithm, present whenever one was made. */
+  recomputedDigest?: string;
+  /** Which algorithm reproduced the stored digest. Only set on `match`. */
+  digestVersion?: "v1" | "v2";
+  /** Effect this policy yields for the record. Only set when re-evaluation ran. */
+  effect?: "allow" | "deny";
+  /** Index into `policy.rules` of the rule that matched, or null for the default. */
+  matchedRuleIndex?: number | null;
+  /**
+   * True when the digest only reproduced under a deny that this policy cannot
+   * derive statically, which a rate limit on the matched rule explains.
+   */
+  rateLimitInferred?: boolean;
+  reason?: string;
+}
+
+export interface DecisionContextSummary {
+  checked: number;
+  matched: number;
+  mismatched: number;
+  unverifiable: number;
+  absent: number;
+}
+
+/**
+ * Recompute a record's `decisionContextDigest` from the record and the policy,
+ * and report whether it reproduces.
+ *
+ * This is what lets a verifier confirm which policy context a decision was made
+ * in, rather than taking the gateway's word for the digest. The record supplies
+ * `principal`, `toolName`, `namespace` and `upstream`; `matchedRule` and
+ * `effect` are not stored on the record at all, so they are recovered by
+ * re-running the policy against a reconstructed ToolEntry.
+ *
+ * A `mismatch` does not distinguish drift from tampering, and cannot: an
+ * operator editing a rule and an attacker editing a rule produce the same
+ * result. It says the record was not written under the policy given here. Pin
+ * the policy alongside the log if you need the stronger claim.
+ *
+ * Two things this deliberately does not attempt. The digest is only recomputable
+ * up to what the policy is a function of, so a rate-limited deny — which depends
+ * on the gateway's request counters, runtime state no verifier holds — is
+ * admitted as a candidate rather than derived; see `rateLimitInferred`. And
+ * `evaluate()` is called on a throwaway engine so this never perturbs a live
+ * gateway's counters.
+ */
+export function verifyDecisionContextDigest(
+  record: AuditRecord,
+  policy: PolicySnapshot,
+): DecisionContextCheck {
+  const storedDigest = record.decisionContextDigest;
+  if (storedDigest === undefined) {
+    return { status: "absent" };
+  }
+
+  // toolName is the namespaced form the gateway wrote; namespace and upstream
+  // are what the policy matches on. Any of them missing means the context this
+  // digest was computed over cannot be rebuilt.
+  const missing = (["toolName", "namespace", "upstream"] as const).filter(
+    (f) => record[f] === undefined,
+  );
+  if (missing.length > 0) {
+    return {
+      status: "unverifiable",
+      storedDigest,
+      reason: `record is missing ${missing.join(", ")}, so the decision context cannot be rebuilt`,
+    };
+  }
+
+  const name = record.toolName!;
+  const namespace = record.namespace!;
+  const prefix = `${namespace}/`;
+  const tool: ToolEntry = {
+    name,
+    // ruleMatches tests the qualified name and the bare upstream name, so both
+    // have to be right. registerUpstreamTools builds name as `${namespace}/${originalName}`.
+    originalName: name.startsWith(prefix) ? name.slice(prefix.length) : name,
+    namespace,
+    upstream: record.upstream!,
+  };
+
+  const engine = new PolicyEngine(policy.defaultEffect, policy.rules);
+  const decision = engine.evaluate(record.principal ?? undefined, tool);
+  const ctx = decision.decisionContext;
+  const matchedRule = ctx.matchedRule;
+  const matchedRuleIndex = matchedRule === null ? null : policy.rules.indexOf(matchedRule);
+
+  // A rate limit can only flip allow to deny, never the reverse, and only on a
+  // rule that declares one. That makes the extra candidate a narrow admission
+  // rather than a blanket "either effect will do".
+  const candidateEffects: Array<"allow" | "deny"> = [ctx.effect];
+  if (ctx.effect === "allow" && matchedRule?.rateLimit) {
+    candidateEffects.push("deny");
+  }
+
+  const versions = [
+    { version: "v2" as const, compute: computeDecisionContextDigest },
+    { version: "v1" as const, compute: computeDecisionContextDigestV1 },
+  ];
+
+  const recomputedDigest = computeDecisionContextDigest({ ...ctx, effect: ctx.effect });
+
+  for (const { version, compute } of versions) {
+    for (const effect of candidateEffects) {
+      if (compute({ ...ctx, effect }) === storedDigest) {
+        return {
+          status: "match",
+          storedDigest,
+          recomputedDigest,
+          digestVersion: version,
+          effect,
+          matchedRuleIndex,
+          rateLimitInferred: effect !== ctx.effect ? true : undefined,
+        };
+      }
+    }
+  }
+
+  return {
+    status: "mismatch",
+    storedDigest,
+    recomputedDigest,
+    effect: ctx.effect,
+    matchedRuleIndex,
+    reason:
+      "decisionContextDigest does not reproduce under this policy: the record was " +
+      "written under a different policy, or the record was altered",
+  };
+}
+
 export async function verifyAuditLog(
   path: string,
   signer: Signer,
-  options?: { verifyChain?: boolean },
+  options?: { verifyChain?: boolean; policy?: PolicySnapshot },
 ): Promise<VerifyResult> {
   const result: VerifyResult = { total: 0, valid: 0, invalid: 0, errors: [] };
+  if (options?.policy) {
+    result.decisionContext = { checked: 0, matched: 0, mismatched: 0, unverifiable: 0, absent: 0 };
+  }
 
   const rl = createInterface({
     input: createReadStream(path),
@@ -71,12 +233,20 @@ export async function verifyAuditLog(
       result.errors.push({ line: lineNum, id: record.id, reason: "signature mismatch" });
     }
 
+    // A record can fail more than one check (chain and decision context, say).
+    // Demotion has to be idempotent or the second failure decrements valid a
+    // second time and the counts stop summing to total.
+    let demoted = !valid;
+    const demote = (): void => {
+      if (demoted) return;
+      demoted = true;
+      result.invalid++;
+      result.valid--;
+    };
+
     if (options?.verifyChain) {
       if (record.previousHash === undefined) {
-        if (valid) {
-          result.invalid++;
-          result.valid--;
-        }
+        demote();
         result.errors.push({
           line: lineNum,
           id: record.id,
@@ -97,6 +267,33 @@ export async function verifyAuditLog(
         }
       }
       previousHash = hashLine(line);
+    }
+
+    if (options?.policy && result.decisionContext) {
+      const summary = result.decisionContext;
+      const check = verifyDecisionContextDigest(record, options.policy);
+      switch (check.status) {
+        case "match":
+          summary.checked++;
+          summary.matched++;
+          break;
+        case "mismatch":
+          summary.checked++;
+          summary.mismatched++;
+          demote();
+          result.errors.push({ line: lineNum, id: record.id, reason: check.reason! });
+          break;
+        case "unverifiable":
+          // Not demoted. The record carries a digest we cannot rebuild the
+          // inputs for, which is a gap in the record, not evidence against it.
+          summary.checked++;
+          summary.unverifiable++;
+          result.errors.push({ line: lineNum, id: record.id, reason: check.reason! });
+          break;
+        case "absent":
+          summary.absent++;
+          break;
+      }
     }
   }
 

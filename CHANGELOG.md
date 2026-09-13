@@ -1,5 +1,34 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `verifyDecisionContextDigest(record, policy)` in `src/attestation/verify.ts`, and a `policy` option on `verifyAuditLog(path, signer, { policy })`. Before this, `verify.ts` contained **zero** occurrences of `decisionContextDigest`: the gateway stamped the digest onto every record it emitted, and no verifier ever recomputed it. A record could carry a digest belonging to an entirely different policy context and pass verification, because the digest was covered by the signature as an opaque field value and by nothing else. The new function rebuilds the `DecisionContext` from the record's `principal`, `toolName`, `namespace` and `upstream`, recovers `matchedRule` and `effect` — neither of which is stored on the record — by re-running `PolicyEngine.evaluate()` against the supplied policy, and reports `match`, `mismatch`, `unverifiable` or `absent`.
+- A stable `computeDecisionContextDigest`. The digest is now `sha256(JSON.stringify(["DecisionContext/v2", canonicalizeValue(dropNullMembers(ordered))]))`, following the `PROJECTION_DOMAIN_TAG` idiom already used by `attestation/witness.ts` so a decision-context digest cannot collide with a record hash or a witness projection on identical inner content.
+- `computeDecisionContextDigestV1`, the previous implementation preserved verbatim and exported. `verifyDecisionContextDigest` tries v2 then v1 and reports which one reproduced in `digestVersion`, so records written by 0.8.2 and earlier still verify.
+- 23 cases in `src/attestation/verify-decision-context.test.ts`. Nine of them assert on records produced by a real `Gateway.handleToolsCall` denial rather than hand-built contexts, since a hand-built context tests the test's idea of the decision context rather than the gateway's.
+
+### Rationale
+
+- **Why the verify side was never implemented: the digest was not reproducible.** v1 hashed `JSON.stringify` of an array holding the raw `matchedRule` object, and `JSON.stringify` emits object keys in insertion order. Measured on v1: the rule `{effect, principals, tools}` and the same rule spelled `{tools, principals, effect}` produce different digests. Reproduction therefore depended on the key insertion order of an in-memory object that no longer exists by the time anyone verifies, so a verifier holding the record and the policy could not reliably recompute the value. The fix is to the property, not the symptom — routing the context through `canonicalizeValue` makes key order and `undefined` members irrelevant, which is what makes recomputation possible at all.
+- `dropNullMembers` additionally folds explicit-null optionals together with absent ones. `canonicalizeValue` drops `undefined` members but keeps `null` ones, and for a `PolicyRule` that distinction carries no meaning: every optional is read as falsy-or-present (`rule.principals && length > 0`, `rule.rateLimit`, `limit.maxPerMinute != null`), so `{effect, rateLimit: null}` and `{effect}` describe the same rule and now digest alike. It is applied to the whole ordered tuple list, not just the rule; the tuples are arrays, so `["principal", null]` keeps its null and an anonymous principal stays distinguishable from a named one.
+- **A `mismatch` cannot separate drift from tampering, and does not claim to.** An operator editing a rule and an attacker editing a rule produce the same result. The finding is that the record was not written under the policy supplied here; the stronger claim requires pinning the policy alongside the log.
+- **The digest is only recomputable up to what the policy is a function of.** A rate-limited deny depends on the gateway's request counters, runtime state no verifier holds, so it is admitted as a candidate rather than derived and flagged in `rateLimitInferred`. The admission is narrow rather than "either effect will do": a rate limit can only flip allow to deny, never the reverse, and only on a rule that declares one, so the opposite-effect candidate is gated on both conditions. Asserted in both directions — a record claiming a deny over a rule with no `rateLimit`, rule held byte-identical so only the effect differs, is a `mismatch`.
+- `originalName` is derived by stripping the `${namespace}/` prefix, because `ruleMatches` tests the qualified name *and* `tool.originalName` while the record only stores the qualified form. A policy may legitimately name a tool without its namespace; without the derivation such a rule never matches and the recomputed context silently becomes the default-effect one. Covered by a dedicated case using a bare-name rule.
+- `evaluate()` runs on a throwaway `PolicyEngine`, so verification never perturbs a live gateway's rate-limit counters. Asserted by checking the same record five times against a 1-per-minute rule and requiring the same verdict each time.
+- `unverifiable` deliberately does not demote a record. A record carrying a digest whose inputs cannot be rebuilt is a gap in the record, not evidence against it; it is reported in `errors` and counted, but the signature verdict stands.
+- Mutation-tested rather than assumed: nine mutants across the digest and the verifier (dropping canonicalization, dropping the null-folding, dropping the `originalName` derivation, ignoring the record principal, ungating the effect flip, removing each demotion, and adding a wrong one) were each injected and reverted. All nine fail at least one case. The ungated-effect-flip mutant initially **survived** — the negative assertion had changed the rule as well as the effect, so the rule difference alone produced the mismatch and the effect gate was never the deciding factor. Replaced with a case holding the rule identical.
+
+### Changed
+
+- New records carry v2 digests, which differ byte-for-byte from v1 for the same context. This does not invalidate any existing signature: the digest is an opaque string field covered by `canonicalizeRecord` like any other, and stored values are untouched. The 46 checkpoint vectors, 46 Python vectors and 51 APS vectors all still pass, confirming the change is isolated to the decision-context digest and does not reach record canonicalization.
+- `VerifyResult` gains an optional `decisionContext` summary (`checked`/`matched`/`mismatched`/`unverifiable`/`absent`), populated only when a `policy` is supplied. Default behaviour of `verifyAuditLog` is unchanged.
+
+### Fixed
+
+- Record demotion inside `verifyAuditLog` is now idempotent. This is a precondition introduced by this change rather than a pre-existing bug: the two chain-mode failure branches are mutually exclusive per record, so nothing could double-decrement before. Adding a third failure source made it reachable — a record failing both the chain check and the digest check would have run `result.valid--` twice and `valid + invalid` would no longer sum to `total`. Asserted directly.
+
 ## [0.8.2] - 2026-09-10
 
 ### Added

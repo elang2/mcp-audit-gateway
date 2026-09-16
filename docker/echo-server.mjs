@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-import { Buffer } from "node:buffer";
+
+// MCP stdio framing is newline-delimited JSON, one message per line.
+const SUPPORTED_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05", "2024-10-07"];
 
 const TOOLS = [
   {
@@ -14,37 +16,28 @@ const TOOLS = [
 ];
 
 function send(obj) {
-  const body = JSON.stringify(obj);
-  const header = `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n`;
-  process.stdout.write(header + body);
+  process.stdout.write(`${JSON.stringify(obj)}\n`);
+}
+
+function negotiate(requested) {
+  return SUPPORTED_PROTOCOL_VERSIONS.includes(requested) ? requested : SUPPORTED_PROTOCOL_VERSIONS[0];
 }
 
 let buffer = "";
 
+process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => {
-  buffer += chunk.toString();
+  buffer += chunk;
 
-  while (true) {
-    const headerEnd = buffer.indexOf("\r\n\r\n");
-    if (headerEnd === -1) break;
-
-    const headerPart = buffer.slice(0, headerEnd);
-    const match = headerPart.match(/Content-Length:\s*(\d+)/i);
-    if (!match) {
-      buffer = buffer.slice(headerEnd + 4);
-      continue;
-    }
-
-    const contentLength = parseInt(match[1], 10);
-    const bodyStart = headerEnd + 4;
-    if (buffer.length < bodyStart + contentLength) break;
-
-    const body = buffer.slice(bodyStart, bodyStart + contentLength);
-    buffer = buffer.slice(bodyStart + contentLength);
+  let newline;
+  while ((newline = buffer.indexOf("\n")) !== -1) {
+    const line = buffer.slice(0, newline).trim();
+    buffer = buffer.slice(newline + 1);
+    if (!line) continue;
 
     let request;
     try {
-      request = JSON.parse(body);
+      request = JSON.parse(line);
     } catch {
       continue;
     }
@@ -65,7 +58,7 @@ function handleRequest(request) {
         jsonrpc: "2.0",
         id,
         result: {
-          protocolVersion: "2025-03-26",
+          protocolVersion: negotiate(params?.protocolVersion),
           capabilities: { tools: {} },
           serverInfo: { name: "echo-server", version: "1.0.0" },
         },

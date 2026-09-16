@@ -1,11 +1,12 @@
+# Image used only for Glama's introspection pass, which needs the server to start
+# and answer initialize/tools/list over MCP stdio. The entrypoint is a
+# zero-dependency script, so there is nothing to install and nothing to compile —
+# the previous version ran `npm ci --omit=dev` followed by `npm run build`, which
+# could not work because tsc is a devDependency.
 FROM node:20-slim
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci --omit=dev
-
-COPY . .
-RUN npm run build
+COPY glama-demo-server.mjs ./
 
 ENTRYPOINT ["node", "glama-demo-server.mjs"]

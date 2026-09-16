@@ -16,15 +16,21 @@ const TOOLS = [
   }
 ];
 
+// MCP stdio framing is newline-delimited JSON, one message per line.
+const SUPPORTED_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05", "2024-10-07"];
+
 function send(obj) {
-  const body = JSON.stringify(obj);
-  process.stdout.write(`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
+  process.stdout.write(`${JSON.stringify(obj)}\n`);
+}
+
+function negotiate(requested) {
+  return SUPPORTED_PROTOCOL_VERSIONS.includes(requested) ? requested : SUPPORTED_PROTOCOL_VERSIONS[0];
 }
 
 function handle(msg) {
   if (msg.method === "initialize") {
-    send({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "mcp-audit-gateway", version: "0.6.0" } } });
-  } else if (msg.method === "notifications/initialized") {
+    send({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: negotiate(msg.params?.protocolVersion), capabilities: { tools: {} }, serverInfo: { name: "mcp-audit-gateway", version: "0.8.2" } } });
+  } else if (msg.method?.startsWith("notifications/")) {
     // no response needed
   } else if (msg.method === "tools/list") {
     send({ jsonrpc: "2.0", id: msg.id, result: { tools: TOOLS } });
@@ -47,17 +53,11 @@ let buf = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => {
   buf += chunk;
-  while (true) {
-    const headerEnd = buf.indexOf("\r\n\r\n");
-    if (headerEnd === -1) break;
-    const header = buf.slice(0, headerEnd);
-    const match = header.match(/Content-Length:\s*(\d+)/i);
-    if (!match) { buf = buf.slice(headerEnd + 4); continue; }
-    const len = parseInt(match[1], 10);
-    const bodyStart = headerEnd + 4;
-    if (buf.length < bodyStart + len) break;
-    const body = buf.slice(bodyStart, bodyStart + len);
-    buf = buf.slice(bodyStart + len);
-    try { handle(JSON.parse(body)); } catch {}
+  let nl;
+  while ((nl = buf.indexOf("\n")) !== -1) {
+    const line = buf.slice(0, nl).trim();
+    buf = buf.slice(nl + 1);
+    if (!line) continue;
+    try { handle(JSON.parse(line)); } catch {}
   }
 });
